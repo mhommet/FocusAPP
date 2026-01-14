@@ -985,20 +985,27 @@ function renderBuild(build) {
       }
     }
 
-    // Recommended Items (Full Build + Situational combined)
+    // Recommended Items (Full Build + Situational combined, no duplicates)
     let recommendedHtml = "";
     const coreIds = (build.items.core || []).map((i) => i.id || i);
+    const startingIds = (build.items.starting || []).map((i) => i.id || i);
     const bootsId = build.items.boots
       ? build.items.boots.id || build.items.boots
       : null;
 
-    // Combiner full_build et situational
+    // Combine full_build and situational, removing duplicates and already-shown items
+    const seenIds = new Set();
     const allRecommended = [
       ...(build.items.full_build || []),
       ...(build.items.situational || []),
     ].filter((item) => {
       const itemId = item.id || item;
-      return !coreIds.includes(itemId) && itemId !== bootsId;
+      // Skip if already in core, starting, boots, or already seen
+      if (coreIds.includes(itemId) || startingIds.includes(itemId) || itemId === bootsId || seenIds.has(itemId)) {
+        return false;
+      }
+      seenIds.add(itemId);
+      return true;
     });
 
     if (allRecommended.length > 0) {

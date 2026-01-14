@@ -352,8 +352,11 @@ def update_ddragon_version() -> None:
         logger.error(f"Failed to fetch DDragon version: {e}")
 
 
-# Initialize DDragon version on module load
-update_ddragon_version()
+# Initialize DDragon version on module load - wrapped for safety
+try:
+    update_ddragon_version()
+except Exception as e:
+    logger.warning(f"Failed to update DDragon version at startup: {e}")
 
 
 class Rank(Enum):

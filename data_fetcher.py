@@ -1,18 +1,22 @@
 """
-League of Legends Companion App - Data Scraper
+League of Legends Companion App - Data Fetcher
 ===============================================
 
 Data Sources:
-- U.GG API: Build data (runes, items, skills, summoners)
-- U.GG Web (Playwright): Tier List
+- Custom API (api.hommet.ch): Build data (runes, items, skills, summoners) and Tier List
 - DDragon: Champion list, item images, spell images
 - CommunityDragon: Rune/perk images
 """
 
-from playwright.sync_api import sync_playwright
 import requests
 import json
 import time
+import logging
+
+# Import api_client at module level for PyInstaller compatibility
+import api_client
+
+logger = logging.getLogger(__name__)
 
 # =============================================================================
 # CONFIGURATION
@@ -36,9 +40,9 @@ def update_ddragon_version():
             "https://ddragon.leagueoflegends.com/api/versions.json", timeout=10
         ).json()
         DDRAGON_VER = versions[0]
-        print(f"[DDragon] Version: {DDRAGON_VER}")
+        logger.info(f"[DDragon] Version: {DDRAGON_VER}")
     except Exception as e:
-        print(f"[DDragon] Version fetch failed: {e}")
+        logger.error(f"[DDragon] Version fetch failed: {e}")
 
 
 def build_champion_id_map():
@@ -76,15 +80,19 @@ def build_champion_id_map():
         CHAMPION_ID_MAP["renata glasc"] = 888
         CHAMPION_ID_MAP["renata"] = 888
 
-        print(f"[DDragon] Loaded {len(CHAMPION_ID_MAP)} champion mappings")
+        logger.info(f"[DDragon] Loaded {len(CHAMPION_ID_MAP)} champion mappings")
 
     except Exception as e:
-        print(f"[DDragon] Failed to build champion map: {e}")
+        logger.error(f"[DDragon] Failed to build champion map: {e}")
 
 
-# Initialize on module load
-update_ddragon_version()
-build_champion_id_map()
+# Initialize on module load - wrapped in try-except to prevent import failures
+try:
+    update_ddragon_version()
+    build_champion_id_map()
+    logger.info("[data_fetcher] Module initialized successfully")
+except Exception as e:
+    logger.error(f"[data_fetcher] Module initialization error: {e}")
 
 # =============================================================================
 # IMAGE URL GENERATORS
@@ -373,7 +381,7 @@ def get_champion_id(champion_name: str) -> int:
     if normalized in CHAMPION_ID_MAP:
         return CHAMPION_ID_MAP[normalized]
 
-    print(f"[U.GG] Champion not found: {champion_name}")
+    logger.warning(f"[U.GG] Champion not found: {champion_name}")
     return None # type: ignore
 
 
@@ -396,22 +404,20 @@ def get_ugg_build(
     Returns:
         dict with runes, items, summoners, skills, winrate, cache info
     """
-    import api_client
-
     refresh_str = " (force refresh)" if force_refresh else ""
-    print(f"[API] Fetching build: {champion_name} @ {role} (Diamond+){refresh_str}")
+    logger.info(f"[API] Fetching build: {champion_name} @ {role} (Diamond+){refresh_str}")
 
     try:
         result = api_client.fetch_build(champion_name, role, force_refresh)
         if result.get("success"):
             cache_info = f" [cached: {result.get('cache_age_hours', 0):.1f}h]" if result.get("cached") else " [fresh]"
-            print(f"[API] Successfully fetched build for {champion_name}{cache_info}")
+            logger.info(f"[API] Successfully fetched build for {champion_name}{cache_info}")
         else:
-            print(f"[API] Build fetch failed: {result.get('error')}")
+            logger.error(f"[API] Build fetch failed: {result.get('error')}")
         return result
 
     except Exception as e:
-        print(f"[API] Error fetching build: {e}")
+        logger.error(f"[API] Error fetching build: {e}")
         return {
             "success": False,
             "error": str(e),
@@ -457,7 +463,7 @@ def get_champion_list() -> list:
         champions.sort(key=lambda x: x["name"])
         return champions
     except Exception as e:
-        print(f"[DDragon] Error fetching champions: {e}")
+        logger.error(f"[DDragon] Error fetching champions: {e}")
         return []
 
 
@@ -488,7 +494,7 @@ def get_items_data() -> list:
             )
         return items
     except Exception as e:
-        print(f"[DDragon] Error fetching items: {e}")
+        logger.error(f"[DDragon] Error fetching items: {e}")
         return []
 
 
@@ -514,20 +520,18 @@ def scrape_tierlist() -> dict:
             "champions": [...] (flat list for table)
         }
     """
-    import api_client
-
-    print("[API] Fetching Tier List (Diamond+ aggregated)...")
+    logger.info("[API] Fetching Tier List (Diamond+ aggregated)...")
 
     try:
         result = api_client.fetch_tierlist()
         if result.get("success"):
-            print(f"[API] Successfully fetched tier list: {result.get('total_champions')} champions")
+            logger.info(f"[API] Successfully fetched tier list: {result.get('total_champions')} champions")
         else:
-            print(f"[API] Tier list fetch failed: {result.get('error')}")
+            logger.error(f"[API] Tier list fetch failed: {result.get('error')}")
         return result
 
     except Exception as e:
-        print(f"[API] Error fetching tier list: {e}")
+        logger.error(f"[API] Error fetching tier list: {e}")
         return {
             "success": False,
             "error": str(e),
