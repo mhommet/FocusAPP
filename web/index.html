@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FOCUS</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" type="image/png" href="logo.ico">
+    <!-- Inclusion d'eel.js (généré automatiquement par Python) -->
+    <script type="text/javascript" src="/eel.js"></script>
+    <!-- Font Awesome pour les icônes (optionnel mais recommandé) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <div class="header-title">
+                <h1>FOCUS <span id="version" class="version-badge">Loading...</span></h1>
+            </div>
+            <button onclick="refreshCurrentTab()" class="btn-refresh">
+                <i class="fas fa-sync-alt"></i> Actualiser
+            </button>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs-nav">
+            <button class="tab-btn active" data-tab="tierlist" onclick="switchTab('tierlist')">
+                <i class="fas fa-trophy"></i> Tier List
+            </button>
+            <button class="tab-btn" data-tab="builds" onclick="switchTab('builds')">
+                <i class="fas fa-hammer"></i> Builds
+            </button>
+            <button class="tab-btn" data-tab="items" onclick="switchTab('items')">
+                <i class="fas fa-gem"></i> Items
+            </button>
+        </nav>
+
+        <!-- TIER LIST TAB -->
+        <div id="tierlist-tab" class="tab-content active">
+            <div class="controls-bar">
+                <!-- Filtre Rôle -->
+                <div class="control-group">
+                    <label for="role-filter"><i class="fas fa-user-tag"></i> Rôle</label>
+                    <select id="role-filter" onchange="applyFilters()">
+                        <option value="all">Tous les Rôles</option>
+                        <option value="Top">Top</option>
+                        <option value="Jungle">Jungle</option>
+                        <option value="Mid">Mid</option>
+                        <option value="ADC">ADC</option>
+                        <option value="Support">Support</option>
+                    </select>
+                </div>
+
+                <div class="control-separator"></div>
+
+                <!-- Last Update Info -->
+                <div class="control-group">
+                    <span id="tierlist-last-update" class="last-update-badge"></span>
+                </div>
+
+                <!-- Recherche -->
+                <div class="control-group search-group">
+                    <label for="search-input"><i class="fas fa-search"></i> Recherche</label>
+                    <input type="text" id="search-input" placeholder="Chercher un champion..." onkeyup="applyFilters()">
+                </div>
+            </div>
+
+            <main>
+                <div class="card">
+                    <table id="tier-list-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable('rank')" title="Trier par rang"># <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable('name')" title="Trier par nom">Champion <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable('role')" title="Trier par rôle">Roles <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable('tier')" title="Trier par tier">Tier <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable('winrate')" title="Trier par winrate">Winrate <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable('pickrate')" title="Trier par pickrate">Pickrate <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable('games')" title="Trier par games">Games <i class="fas fa-sort"></i></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td colspan="7" class="loading-cell">En attente des donnees...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <!-- Pagination -->
+                    <div id="pagination" class="pagination"></div>
+                </div>
+            </main>
+        </div>
+
+        <!-- BUILDS TAB -->
+        <div id="builds-tab" class="tab-content">
+            <div class="controls-bar">
+                <div class="control-group">
+                    <label for="champion-select"><i class="fas fa-user"></i> Champion</label>
+                    <select id="champion-select" onchange="loadChampionBuild()">
+                        <option value="">-- Sélectionner --</option>
+                    </select>
+                </div>
+
+                <div class="control-separator"></div>
+
+                <div class="control-group">
+                    <label for="role-select"><i class="fas fa-map"></i> Rôle</label>
+                    <select id="role-select" onchange="loadChampionBuild()">
+                        <option value="top">Top</option>
+                        <option value="jungle">Jungle</option>
+                        <option value="mid">Mid</option>
+                        <option value="adc">ADC</option>
+                        <option value="support">Support</option>
+                    </select>
+                </div>
+
+                <div class="control-separator"></div>
+
+                <!-- Refresh Button -->
+                <div class="control-group">
+                    <button id="build-refresh-btn" class="btn-refresh-small" onclick="forceRefreshBuild()" title="Force refresh data">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+
+                <!-- Cache Info -->
+                <div class="control-group">
+                    <span id="build-cache-info" class="cache-info-badge"></span>
+                </div>
+            </div>
+
+            <main>
+                <div id="build-container" class="build-container">
+                    <div class="build-placeholder">
+                        <i class="fas fa-hammer"></i>
+                        <p>Selectionnez un champion pour voir son build</p>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- ITEMS TAB -->
+        <div id="items-tab" class="tab-content">
+            <div class="controls-bar">
+                <div class="control-group">
+                    <label for="item-category"><i class="fas fa-layer-group"></i> Catégorie</label>
+                    <select id="item-category" onchange="filterItems()">
+                        <option value="all">Tous les Items</option>
+                        <option value="legendary">Légendaires</option>
+                        <option value="epic">Epiques</option>
+                        <option value="basic">Basiques</option>
+                    </select>
+                </div>
+
+                <div class="control-separator"></div>
+
+                <div class="control-group">
+                    <label for="item-stat"><i class="fas fa-chart-bar"></i> Stat</label>
+                    <select id="item-stat" onchange="filterItems()">
+                        <option value="all">Toutes les Stats</option>
+                        <option value="ad">Attack Damage</option>
+                        <option value="ap">Ability Power</option>
+                        <option value="health">Health</option>
+                        <option value="armor">Armor</option>
+                        <option value="mr">Magic Resist</option>
+                        <option value="as">Attack Speed</option>
+                        <option value="crit">Critical Strike</option>
+                    </select>
+                </div>
+
+                <div class="control-group search-group">
+                    <label for="item-search"><i class="fas fa-search"></i> Recherche</label>
+                    <input type="text" id="item-search" placeholder="Chercher un item..." onkeyup="filterItems()">
+                </div>
+            </div>
+
+            <main>
+                <div class="card">
+                    <div id="items-grid" class="items-grid">
+                        <div class="loading-cell">En attente des données...</div>
+                    </div>
+                    <!-- Pagination Items -->
+                    <div id="items-pagination" class="pagination"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+
+</html>

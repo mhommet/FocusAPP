@@ -1,0 +1,6 @@
+eel==0.16.0
+playwright==1.49.1
+requests==2.31.0
+beautifulsoup4==4.12.3
+greenlet==3.0.3
+gevent==23.9.1
