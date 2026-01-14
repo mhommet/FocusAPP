@@ -1,4 +1,4 @@
-# FOCUS - League of Legends Companion
+# FOCUS - League of Legends Companio
 
 > A modern desktop application for viewing champion builds, tier lists, and item data for League of Legends.
 
@@ -31,8 +31,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/milanhommet/LoLCompanion.git
-cd LoLCompanion
+git clone https://github.com/milanhommet/FocusAPP.git
+cd FocusAPP
 
 # Install dependencies
 pip install -r requirements.txt
@@ -72,7 +72,7 @@ pyinstaller app.spec
 ## Project Structure
 
 ```
-LoLCompanion/
+FocusAPP/
 ├── app.py              # Main Eel application entry point
 ├── api_client.py       # API client for fetching data
 ├── data_fetcher.py     # Data fetching and formatting

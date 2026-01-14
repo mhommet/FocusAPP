@@ -505,7 +505,7 @@ class LeagueAPIClient:
         self.session = requests.Session()
         self.session.headers.update(
             {
-                "User-Agent": "LoLCompanion/1.0",
+                "User-Agent": "FocusAPP/1.0",
                 "Accept": "application/json",
                 "Content-Type": "application/json",
             }

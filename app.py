@@ -1,5 +1,5 @@
 """
-League of Legends Companion App - Main Entry Point
+Focus App - Main Entry Point
 ===================================================
 
 A desktop application for viewing champion builds, tier lists, and items data.
@@ -157,7 +157,7 @@ def get_resource_path(relative_path: str) -> str:
     """
     if getattr(sys, 'frozen', False):
         # Running as compiled executable (PyInstaller)
-        base_path = sys._MEIPASS
+        base_path = sys._MEIPASS # pyright: ignore[reportAttributeAccessIssue]
     else:
         # Running as script
         base_path = os.path.dirname(os.path.abspath(__file__))

@@ -1,5 +1,5 @@
 """
-League of Legends Companion App - Data Fetcher
+FocusAPP - Data Fetcher
 ===============================================
 
 Data Sources:
