@@ -181,6 +181,19 @@
                     </select>
                 </div>
 
+                <div class="control-separator"></div>
+
+                <div class="control-group">
+                    <label for="item-price"><i class="fas fa-coins"></i> Prix</label>
+                    <select id="item-price" onchange="filterItems()">
+                        <option value="all">Tous les Prix</option>
+                        <option value="0-1000">< 1000g (Early)</option>
+                        <option value="1000-2000">1000-2000g (Mid)</option>
+                        <option value="2000-3000">2000-3000g (Late)</option>
+                        <option value="3000+">3000g+ (Full)</option>
+                    </select>
+                </div>
+
                 <div class="control-group search-group">
                     <label for="item-search"><i class="fas fa-search"></i> Recherche</label>
                     <input type="text" id="item-search" placeholder="Chercher un item..." onkeyup="filterItems()">

@@ -479,13 +479,39 @@ function filterItems(resetPage = true) {
 
   const category = document.getElementById("item-category").value;
   const statType = document.getElementById("item-stat").value;
+  const priceRange = document.getElementById("item-price").value;
   const searchText = document.getElementById("item-search").value.toLowerCase();
 
   filteredItems = allItems.filter((item) => {
     const matchCategory = category === "all" || item.category === category;
-    const matchStat = statType === "all" || item.stat_type === statType;
+    // Check against stat_types array (multiple stats per item) or fallback to stat_type
+    const matchStat =
+      statType === "all" ||
+      (item.stat_types && item.stat_types.includes(statType)) ||
+      item.stat_type === statType;
     const matchSearch = item.name.toLowerCase().includes(searchText);
-    return matchCategory && matchStat && matchSearch;
+
+    // Price filter
+    let matchPrice = true;
+    if (priceRange !== "all") {
+      const gold = item.gold || 0;
+      switch (priceRange) {
+        case "0-1000":
+          matchPrice = gold < 1000;
+          break;
+        case "1000-2000":
+          matchPrice = gold >= 1000 && gold < 2000;
+          break;
+        case "2000-3000":
+          matchPrice = gold >= 2000 && gold < 3000;
+          break;
+        case "3000+":
+          matchPrice = gold >= 3000;
+          break;
+      }
+    }
+
+    return matchCategory && matchStat && matchSearch && matchPrice;
   });
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPageGrid);

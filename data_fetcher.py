@@ -473,6 +473,19 @@ def get_items_data() -> list:
         url = f"https://ddragon.leagueoflegends.com/cdn/{DDRAGON_VER}/data/en_US/item.json"
         data = requests.get(url, timeout=10).json()["data"]
         items = []
+
+        # Mapping DDragon stat keys to frontend filter values
+        stat_mapping = {
+            "FlatPhysicalDamageMod": "ad",
+            "FlatMagicDamageMod": "ap",
+            "FlatHPPoolMod": "health",
+            "PercentHPPoolMod": "health",
+            "FlatArmorMod": "armor",
+            "FlatSpellBlockMod": "mr",
+            "PercentAttackSpeedMod": "as",
+            "FlatCritChanceMod": "crit",
+        }
+
         for item_id, val in data.items():
             if not val.get("gold", {}).get("purchasable", True):
                 continue
@@ -480,6 +493,19 @@ def get_items_data() -> list:
             category = (
                 "legendary" if gold >= 2500 else ("epic" if gold >= 1000 else "basic")
             )
+
+            # Detect stat types from DDragon stats object
+            item_stats = val.get("stats", {})
+            stat_types = []
+            for ddragon_key, filter_value in stat_mapping.items():
+                if ddragon_key in item_stats and item_stats[ddragon_key] != 0:
+                    if filter_value not in stat_types:
+                        stat_types.append(filter_value)
+
+            # Primary stat_type is the first detected stat (for single-stat filtering)
+            # stat_types list allows for multi-stat filtering if needed
+            primary_stat = stat_types[0] if stat_types else None
+
             items.append(
                 {
                     "id": item_id,
@@ -489,6 +515,8 @@ def get_items_data() -> list:
                     "image": get_item_image_url(item_id),
                     "category": category,
                     "stats": val.get("plaintext", ""),
+                    "stat_type": primary_stat,
+                    "stat_types": stat_types,
                     "efficiency": 100,
                 }
             )
