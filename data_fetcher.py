@@ -503,12 +503,15 @@ def get_items_data() -> list:
 # =============================================================================
 
 
-def scrape_tierlist() -> dict:
+def scrape_tierlist(role: str = None) -> dict:
     """
     Fetch tier list from custom API (api.hommet.ch).
 
     The API automatically aggregates Diamond+ data (Diamond, Master,
     Grandmaster, Challenger) for best statistics.
+
+    Args:
+        role: Optional role filter ('top', 'jungle', 'mid', 'adc', 'support')
 
     Returns:
         dict: {
@@ -520,10 +523,11 @@ def scrape_tierlist() -> dict:
             "champions": [...] (flat list for table)
         }
     """
-    logger.info("[API] Fetching Tier List (Diamond+ aggregated)...")
+    role_str = f" for role={role}" if role else ""
+    logger.info(f"[API] Fetching Tier List (Diamond+ aggregated){role_str}...")
 
     try:
-        result = api_client.fetch_tierlist()
+        result = api_client.fetch_tierlist(role=role)
         if result.get("success"):
             logger.info(f"[API] Successfully fetched tier list: {result.get('total_champions')} champions")
         else:

@@ -414,6 +414,76 @@ tbody tr:last-child td {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* --- ROLE FILTER BUTTONS (Inline Small Version) --- */
+.role-filter-group {
+  flex-direction: row !important;
+}
+
+.role-filter-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.role-filter-btn-small {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(17, 17, 27, 0.6);
+  border: 1.5px solid rgba(205, 214, 244, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.role-filter-btn-small:hover {
+  background: rgba(205, 214, 244, 0.1);
+  border-color: rgba(249, 226, 175, 0.4);
+  transform: translateY(-2px);
+}
+
+.role-filter-btn-small.active {
+  background: rgba(249, 226, 175, 0.15);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  box-shadow: 0 0 10px rgba(249, 226, 175, 0.15);
+}
+
+.role-icon-small {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0.7);
+  transition: filter 0.2s ease;
+}
+
+.role-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-cell .role-icon-small {
+  filter: brightness(1);
+  width: 18px;
+  height: 18px;
+}
+
+.role-filter-btn-small:hover .role-icon-small {
+  filter: brightness(1);
+}
+
+.role-filter-btn-small.active .role-icon-small {
+  filter: brightness(1) drop-shadow(0 0 3px rgba(249, 226, 175, 0.5));
+}
+
+.role-filter-btn-small i {
+  font-size: 0.9rem;
+}
+
 /* --- ITEMS GRID --- */
 .items-grid {
   display: grid;

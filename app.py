@@ -207,12 +207,15 @@ def get_app_version() -> str:
 
 
 @eel.expose
-def get_champion_tier_list() -> dict:
+def get_champion_tier_list(role: Optional[str] = None) -> dict:
     """
     Fetch tier list from API.
 
     The API automatically aggregates Diamond+ data (Diamond, Master,
     Grandmaster, Challenger) for best statistics.
+
+    Args:
+        role: Optional role filter ('top', 'jungle', 'mid', 'adc', 'support')
 
     Returns:
         dict: Tier list data with the following structure:
@@ -223,9 +226,10 @@ def get_champion_tier_list() -> dict:
             - last_update (str): ISO datetime of last update
             - champions (list): Flat list for table compatibility
     """
-    logger.info("Fetching Tier List (Diamond+ aggregated)...")
+    role_str = f" for role={role}" if role else ""
+    logger.info(f"Fetching Tier List (Diamond+ aggregated){role_str}...")
     try:
-        data = data_fetcher.scrape_tierlist()
+        data = data_fetcher.scrape_tierlist(role=role)
         logger.debug(f"Tier list response: success={data.get('success') if data else 'None'}")
         if not data or not data.get("success", False):
             error_msg = data.get("error", "Failed to fetch tier list") if data else "No data returned"

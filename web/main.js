@@ -31,6 +31,9 @@ let currentSort = { column: "rank", direction: "asc" };
 /** @type {string} Currently active tab */
 let currentTab = "tierlist";
 
+/** @type {string} Currently selected role filter */
+let currentRoleFilter = "all";
+
 // Pagination state
 /** @type {number} Current page number for tier list */
 let currentPage = 1;
@@ -120,11 +123,31 @@ function refreshCurrentTab() {
 // =============================================================================
 
 /**
- * Fetch and display the tier list from the API.
- * Shows Diamond+ aggregated champion rankings.
+ * Filter tier list by role.
+ * Updates the active button state and fetches data from API.
+ * @param {string} role - Role to filter by ('all', 'top', 'jungle', 'mid', 'adc', 'support')
  * @returns {Promise<void>}
  */
-async function refreshTierList() {
+async function filterByRole(role) {
+  // Update active button state
+  document.querySelectorAll(".role-filter-btn-small").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.role === role);
+  });
+
+  currentRoleFilter = role;
+  currentPage = 1;
+
+  // Fetch tier list with role filter
+  await refreshTierList(role === "all" ? null : role);
+}
+
+/**
+ * Fetch and display the tier list from the API.
+ * Shows Diamond+ aggregated champion rankings.
+ * @param {string|null} role - Optional role filter
+ * @returns {Promise<void>}
+ */
+async function refreshTierList(role = null) {
   // Show loading spinner
   const tbody = document.querySelector("#tier-list-table tbody");
   if (tbody) {
@@ -146,7 +169,8 @@ async function refreshTierList() {
   if (lastUpdateEl) lastUpdateEl.innerHTML = "";
 
   // Fetch tier list (API automatically aggregates Diamond+ data)
-  const data = await eel.get_champion_tier_list()();
+  // Pass role parameter if specified
+  const data = await eel.get_champion_tier_list(role)();
 
   // Data format: {success, champions, tier_list, last_update, counts, total_champions}
   if (data && data.success && data.champions && data.champions.length > 0) {
@@ -187,21 +211,16 @@ async function refreshTierList() {
  * @returns {void}
  */
 function applyFilters(resetPage = true) {
-  const roleFilter = document.getElementById("role-filter").value;
   const searchText = document
     .getElementById("search-input")
     .value.toLowerCase();
 
   if (resetPage) currentPage = 1;
 
-  // Filter
+  // Filter by search text only (role filtering is done via API)
   filteredChampions = allChampions.filter((champ) => {
-    // Role filter - check if role string contains the filter value
-    const champRoles = champ.role ? champ.role.toLowerCase() : "";
-    const matchRole =
-      roleFilter === "all" || champRoles.includes(roleFilter.toLowerCase());
     const matchSearch = champ.name.toLowerCase().includes(searchText);
-    return matchRole && matchSearch;
+    return matchSearch;
   });
 
   // Sort
@@ -299,17 +318,23 @@ function updateTable(champions) {
 
   tbody.innerHTML = champions
     .map(
-      (champ) => `
+      (champ) => {
+        const roleIcon = getRoleIcon(champ.role);
+        const roleDisplay = roleIcon
+          ? `<span class="role-cell"><img src="${roleIcon}" alt="${champ.role}" class="role-icon-small" onerror="this.style.display='none'"> ${champ.role}</span>`
+          : champ.role;
+        return `
         <tr>
             <td>#${champ.rank}</td>
             <td><strong>${champ.name}</strong></td>
-            <td>${champ.role}</td>
+            <td>${roleDisplay}</td>
             <td class="${getTierClass(champ.tier)}">${champ.tier}</td>
             <td>${champ.winrate}</td>
             <td>${champ.pickrate || "-"}</td>
             <td>${champ.games ? champ.games.toLocaleString() : "-"}</td>
         </tr>
-    `
+    `;
+      }
     )
     .join("");
 }
@@ -322,6 +347,25 @@ function getTierClass(tier) {
   if (tier === "C") return "tier-c";
   if (tier === "D") return "tier-d";
   return "";
+}
+
+/**
+ * Get the icon URL for a given role.
+ * @param {string} role - Role name (top, jungle, mid, adc, support)
+ * @returns {string} URL of the role icon
+ */
+function getRoleIcon(role) {
+  const roleIcons = {
+    top: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top.png",
+    jungle: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle.png",
+    mid: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png",
+    middle: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png",
+    adc: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png",
+    bottom: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png",
+    support: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png",
+    utility: "https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png"
+  };
+  return roleIcons[role?.toLowerCase()] || "";
 }
 
 function updatePagination(totalPages) {
@@ -1091,6 +1135,7 @@ function renderBuild(build) {
 window.switchTab = switchTab;
 window.refreshCurrentTab = refreshCurrentTab;
 window.refreshTierList = refreshTierList;
+window.filterByRole = filterByRole;
 window.refreshItems = refreshItems;
 window.loadChampionBuild = loadChampionBuild;
 window.forceRefreshBuild = forceRefreshBuild;

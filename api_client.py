@@ -841,21 +841,27 @@ class LeagueAPIClient:
     # TIERLIST ENDPOINT
     # =========================================================================
 
-    def get_tierlist(self) -> dict:
+    def get_tierlist(self, role: str = None) -> dict:
         """
         Fetch tier list from API.
 
         The API aggregates Diamond+ data (Diamond, Master, Grandmaster, Challenger)
         for best statistics.
 
+        Args:
+            role: Optional role filter ('top', 'jungle', 'mid', 'adc', 'support')
+
         Returns:
             dict: Complete tier list with metadata
         """
         endpoint = "/tierlist"
+        params = {}
+        if role:
+            params["role"] = role.lower()
 
         try:
-            data = self._make_request("GET", endpoint)
-            return self._format_tierlist_response(data)
+            data = self._make_request("GET", endpoint, params=params if params else None)
+            return self._format_tierlist_response(data, filtered_role=role)
         except APIError as e:
             logger.error(f"Tierlist error: {e}")
             return {
@@ -868,12 +874,13 @@ class LeagueAPIClient:
                 "champions": [],
             }
 
-    def _format_tierlist_response(self, data: dict) -> dict:
+    def _format_tierlist_response(self, data: dict, filtered_role: str = None) -> dict:
         """
         Format tier list response for the application.
 
         Args:
             data: Raw API response
+            filtered_role: The role filter applied (e.g., 'top', 'mid', etc.)
 
         Returns:
             dict: Formatted tier list with flat list for table display
@@ -900,6 +907,19 @@ class LeagueAPIClient:
                 pickrate = champ.get("pickrate")
                 pickrate_str = f"{pickrate:.1f}%" if pickrate is not None else "-"
 
+                # Determine the role string to display
+                # If a role filter was applied, show that specific role
+                # Otherwise, show the role from the champion entry, or all roles, or "Flex" as fallback
+                if filtered_role:
+                    display_role = filtered_role.title()
+                elif champ.get("role"):
+                    # Single role from API (for global tierlist showing individual entries)
+                    display_role = champ.get("role").title()
+                elif roles:
+                    display_role = ", ".join([r.title() for r in roles])
+                else:
+                    display_role = "Flex"
+
                 # Create formatted entry
                 formatted_entry = {
                     "champion": champion_name,
@@ -911,9 +931,7 @@ class LeagueAPIClient:
                     "pickrate_str": pickrate_str,
                     "games_analyzed": champ.get("games_analyzed", 0),
                     "roles": roles,
-                    "roles_str": (
-                        ", ".join([r.title() for r in roles]) if roles else "Flex"
-                    ),
+                    "roles_str": display_role,
                     "performance_score": champ.get("performance_score", 0),
                     "image": f"https://ddragon.leagueoflegends.com/cdn/{DDRAGON_VERSION}/img/champion/{champion_name.title()}.png",
                 }
@@ -990,17 +1008,20 @@ def fetch_build(
     return client.get_build(champion, role, force_refresh)
 
 
-def fetch_tierlist() -> dict:
+def fetch_tierlist(role: str = None) -> dict:
     """
     Utility function to fetch the tier list.
 
     The API aggregates Diamond+ data for best statistics.
 
+    Args:
+        role: Optional role filter ('top', 'jungle', 'mid', 'adc', 'support')
+
     Returns:
         dict: Complete tier list with tier_list, counts, last_update, champions
     """
     client = get_api_client()
-    return client.get_tierlist()
+    return client.get_tierlist(role=role)
 
 
 # =============================================================================
