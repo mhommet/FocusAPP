@@ -463,6 +463,17 @@ async function refreshItems() {
   }
   document.getElementById("items-pagination").innerHTML = "";
 
+  // Load patch version
+  try {
+    const patchVersion = await eel.get_ddragon_version()();
+    const patchBadge = document.getElementById("items-patch-version");
+    if (patchBadge) {
+      patchBadge.textContent = `Patch ${patchVersion}`;
+    }
+  } catch (e) {
+    console.error("Failed to load patch version:", e);
+  }
+
   const data = await eel.get_items_data()();
 
   if (data && data.length > 0) {
@@ -480,6 +491,7 @@ function filterItems(resetPage = true) {
   const category = document.getElementById("item-category").value;
   const statType = document.getElementById("item-stat").value;
   const priceRange = document.getElementById("item-price").value;
+  const efficiencyFilter = document.getElementById("item-efficiency").value;
   const searchText = document.getElementById("item-search").value.toLowerCase();
 
   filteredItems = allItems.filter((item) => {
@@ -511,7 +523,28 @@ function filterItems(resetPage = true) {
       }
     }
 
-    return matchCategory && matchStat && matchSearch && matchPrice;
+    // Efficiency filter
+    let matchEfficiency = true;
+    if (efficiencyFilter !== "all") {
+      const eff = item.efficiency;
+      if (eff === null || eff === undefined) {
+        matchEfficiency = false; // Hide items without efficiency when filtering
+      } else {
+        switch (efficiencyFilter) {
+          case "high":
+            matchEfficiency = eff >= 100;
+            break;
+          case "medium":
+            matchEfficiency = eff >= 90 && eff < 100;
+            break;
+          case "low":
+            matchEfficiency = eff < 90;
+            break;
+        }
+      }
+    }
+
+    return matchCategory && matchStat && matchSearch && matchPrice && matchEfficiency;
   });
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPageGrid);
@@ -525,6 +558,41 @@ function filterItems(resetPage = true) {
   updateItemsPagination(totalPages);
 }
 
+// Helper function to format raw stats for display
+function formatRawStats(rawStats) {
+  if (!rawStats || Object.keys(rawStats).length === 0) {
+    return "";
+  }
+
+  const statNames = {
+    FlatPhysicalDamageMod: { name: "AD", icon: "⚔️" },
+    FlatMagicDamageMod: { name: "AP", icon: "✨" },
+    FlatArmorMod: { name: "Armor", icon: "🛡️" },
+    FlatSpellBlockMod: { name: "MR", icon: "🔮" },
+    FlatHPPoolMod: { name: "HP", icon: "❤️" },
+    FlatMPPoolMod: { name: "Mana", icon: "💧" },
+    PercentAttackSpeedMod: { name: "AS", icon: "⚡", isPercent: true },
+    FlatCritChanceMod: { name: "Crit", icon: "💥", isPercent: true },
+    FlatMovementSpeedMod: { name: "MS", icon: "👟" },
+    PercentMovementSpeedMod: { name: "MS", icon: "👟", isPercent: true },
+    FlatHPRegenMod: { name: "HP Regen", icon: "💚" },
+    FlatMPRegenMod: { name: "Mana Regen", icon: "💙" },
+    PercentLifeStealMod: { name: "Lifesteal", icon: "🩸", isPercent: true },
+  };
+
+  const formatted = [];
+  for (const [key, value] of Object.entries(rawStats)) {
+    if (value === 0) continue;
+    const stat = statNames[key];
+    if (stat) {
+      let displayValue = stat.isPercent ? `${Math.round(value * 100)}%` : `+${Math.round(value)}`;
+      formatted.push(`<span class="stat-tag">${stat.icon} ${displayValue} ${stat.name}</span>`);
+    }
+  }
+
+  return formatted.join(" ");
+}
+
 function updateItemsGrid(items) {
   const grid = document.getElementById("items-grid");
   if (!grid) return;
@@ -536,9 +604,25 @@ function updateItemsGrid(items) {
 
   grid.innerHTML = items
     .map((item) => {
-      let efficiencyClass = "efficiency-low";
-      if (item.efficiency >= 100) efficiencyClass = "efficiency-high";
-      else if (item.efficiency >= 80) efficiencyClass = "efficiency-medium";
+      // Handle null efficiency (items without calculable stats)
+      let efficiencyClass = "efficiency-na";
+      let efficiencyText = "N/A";
+
+      if (item.efficiency !== null && item.efficiency !== undefined) {
+        efficiencyText = `${item.efficiency}%`;
+        if (item.efficiency >= 100) {
+          efficiencyClass = "efficiency-high";
+        } else if (item.efficiency >= 90) {
+          efficiencyClass = "efficiency-medium";
+        } else {
+          efficiencyClass = "efficiency-low";
+        }
+      }
+
+      // Format raw stats if available, otherwise use plaintext
+      const statsDisplay = item.raw_stats
+        ? formatRawStats(item.raw_stats)
+        : item.stats || "Passive effects";
 
       return `
             <div class="item-card">
@@ -550,12 +634,8 @@ function updateItemsGrid(items) {
                     <div class="item-gold"><i class="fas fa-coins"></i> ${
                       item.gold
                     } gold</div>
-                    <div class="item-stats">${
-                      item.stats || "Passive effects"
-                    }</div>
-                    <span class="item-efficiency ${efficiencyClass}">${
-        item.efficiency
-      }% efficient</span>
+                    <div class="item-stats">${statsDisplay || "Passive effects"}</div>
+                    <span class="item-efficiency ${efficiencyClass}">${efficiencyText} efficient</span>
                 </div>
             </div>
         `;

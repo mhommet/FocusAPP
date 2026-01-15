@@ -441,6 +441,60 @@ def get_ugg_build(
 
 
 # =============================================================================
+# GOLD EFFICIENCY CALCULATION
+# =============================================================================
+
+# Gold values per stat point (Patch 14.x reference values)
+# These are derived from the cheapest items that provide each stat
+GOLD_VALUES = {
+    # DDragon stat key: gold value per point
+    "FlatPhysicalDamageMod": 35,          # 1 AD = 35 gold (Long Sword)
+    "FlatMagicDamageMod": 21.75,          # 1 AP = 21.75 gold (Amplifying Tome)
+    "FlatArmorMod": 20,                   # 1 Armor = 20 gold (Cloth Armor)
+    "FlatSpellBlockMod": 18,              # 1 MR = 18 gold (Null-Magic Mantle)
+    "FlatHPPoolMod": 2.67,                # 1 HP = 2.67 gold (Ruby Crystal)
+    "FlatMPPoolMod": 1.4,                 # 1 Mana = 1.4 gold (Sapphire Crystal)
+    "PercentAttackSpeedMod": 2500,        # 100% AS = 2500 gold (1% = 25 gold, stored as 0.01-1.0)
+    "FlatCritChanceMod": 4000,            # 100% Crit = 4000 gold (1% = 40 gold, stored as 0.01-1.0)
+    "FlatMovementSpeedMod": 12,           # 1 flat MS = 12 gold (Boots)
+    "PercentMovementSpeedMod": 3950,      # 100% MS = 3950 gold (1% = 39.5 gold)
+    "FlatHPRegenMod": 36,                 # 1 HP/5 = 36 gold (Rejuvenation Bead)
+    "FlatMPRegenMod": 50,                 # 1 Mana/5 = 50 gold (Faerie Charm)
+    "PercentLifeStealMod": 2750,          # 100% LS = 2750 gold (1% = 27.5 gold)
+}
+
+
+def calculate_gold_efficiency(item_stats: dict, gold_price: int) -> float | None:
+    """
+    Calculate gold efficiency of an item.
+
+    Gold Efficiency = (Total stat value in gold / Item price) × 100
+
+    Args:
+        item_stats: Dictionary of DDragon stat keys and values
+        gold_price: Total gold cost of the item
+
+    Returns:
+        Gold efficiency percentage rounded to 1 decimal, or None if not calculable
+    """
+    if not item_stats or gold_price <= 0:
+        return None
+
+    total_gold_value = 0.0
+
+    for stat_key, stat_value in item_stats.items():
+        if stat_key in GOLD_VALUES and stat_value != 0:
+            total_gold_value += stat_value * GOLD_VALUES[stat_key]
+
+    # Items without calculable stats (e.g., wards, pure passive items)
+    if total_gold_value == 0:
+        return None
+
+    efficiency = (total_gold_value / gold_price) * 100
+    return round(efficiency, 1)
+
+
+# =============================================================================
 # DDRAGON UTILITIES
 # =============================================================================
 
@@ -467,62 +521,40 @@ def get_champion_list() -> list:
         return []
 
 
-def get_items_data() -> list:
-    """Fetch items list from DDragon"""
+def get_items_data(refresh: bool = False) -> list:
+    """
+    Fetch items list from API (api.hommet.ch).
+
+    The API provides items with pre-calculated gold efficiency and
+    DDragon image URLs.
+
+    Args:
+        refresh: Force cache refresh on API side
+
+    Returns:
+        list: List of item objects formatted for frontend
+    """
+    global DDRAGON_VER
+
     try:
-        url = f"https://ddragon.leagueoflegends.com/cdn/{DDRAGON_VER}/data/en_US/item.json"
-        data = requests.get(url, timeout=10).json()["data"]
-        items = []
+        result = api_client.fetch_items(refresh=refresh)
 
-        # Mapping DDragon stat keys to frontend filter values
-        stat_mapping = {
-            "FlatPhysicalDamageMod": "ad",
-            "FlatMagicDamageMod": "ap",
-            "FlatHPPoolMod": "health",
-            "PercentHPPoolMod": "health",
-            "FlatArmorMod": "armor",
-            "FlatSpellBlockMod": "mr",
-            "PercentAttackSpeedMod": "as",
-            "FlatCritChanceMod": "crit",
-        }
+        if not result.get("success"):
+            logger.error(f"[API] Items fetch failed: {result.get('error')}")
+            return []
 
-        for item_id, val in data.items():
-            if not val.get("gold", {}).get("purchasable", True):
-                continue
-            gold = val["gold"]["total"]
-            category = (
-                "legendary" if gold >= 2500 else ("epic" if gold >= 1000 else "basic")
-            )
+        # Update DDragon version from API response
+        api_version = result.get("version")
+        if api_version:
+            DDRAGON_VER = api_version
+            logger.info(f"[API] DDragon version updated to: {DDRAGON_VER}")
 
-            # Detect stat types from DDragon stats object
-            item_stats = val.get("stats", {})
-            stat_types = []
-            for ddragon_key, filter_value in stat_mapping.items():
-                if ddragon_key in item_stats and item_stats[ddragon_key] != 0:
-                    if filter_value not in stat_types:
-                        stat_types.append(filter_value)
-
-            # Primary stat_type is the first detected stat (for single-stat filtering)
-            # stat_types list allows for multi-stat filtering if needed
-            primary_stat = stat_types[0] if stat_types else None
-
-            items.append(
-                {
-                    "id": item_id,
-                    "name": val["name"],
-                    "description": val.get("plaintext", ""),
-                    "gold": gold,
-                    "image": get_item_image_url(item_id),
-                    "category": category,
-                    "stats": val.get("plaintext", ""),
-                    "stat_type": primary_stat,
-                    "stat_types": stat_types,
-                    "efficiency": 100,
-                }
-            )
+        items = result.get("items", [])
+        logger.info(f"[API] Successfully fetched {len(items)} items")
         return items
+
     except Exception as e:
-        logger.error(f"[DDragon] Error fetching items: {e}")
+        logger.error(f"[API] Error fetching items: {e}")
         return []
 
 

@@ -838,6 +838,122 @@ class LeagueAPIClient:
         }
 
     # =========================================================================
+    # ITEMS ENDPOINT
+    # =========================================================================
+
+    def get_items(self, refresh: bool = False) -> dict:
+        """
+        Fetch all items from API.
+
+        Args:
+            refresh: Force cache refresh on API side
+
+        Returns:
+            dict: Items data with version and all items
+        """
+        endpoint = "/items"
+        params = {"refresh": "true" if refresh else "false"}
+
+        try:
+            data = self._make_request("GET", endpoint, params)
+            return self._format_items_response(data)
+        except APIError as e:
+            logger.error(f"Items error: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "version": DDRAGON_VERSION,
+                "items": [],
+            }
+
+    def _format_items_response(self, data: dict) -> dict:
+        """
+        Format items API response for the frontend.
+
+        Args:
+            data: Raw API response
+
+        Returns:
+            dict: Formatted items list
+        """
+        if not data.get("success"):
+            return {
+                "success": False,
+                "error": data.get("error", "Unknown error"),
+                "version": DDRAGON_VERSION,
+                "items": [],
+            }
+
+        version = data.get("version", DDRAGON_VERSION)
+        raw_items = data.get("items", {})
+        formatted_items = []
+
+        # Mapping DDragon stat keys to frontend filter values
+        stat_mapping = {
+            "FlatPhysicalDamageMod": "ad",
+            "FlatMagicDamageMod": "ap",
+            "FlatHPPoolMod": "health",
+            "PercentHPPoolMod": "health",
+            "FlatArmorMod": "armor",
+            "FlatSpellBlockMod": "mr",
+            "PercentAttackSpeedMod": "as",
+            "FlatCritChanceMod": "crit",
+        }
+
+        for item_id, item_data in raw_items.items():
+            gold_data = item_data.get("gold", {})
+            gold_total = gold_data.get("total", 0)
+
+            # Skip non-purchasable items
+            if not gold_data.get("purchasable", True):
+                continue
+
+            # Determine category based on price
+            if gold_total >= 2500:
+                category = "legendary"
+            elif gold_total >= 1000:
+                category = "epic"
+            else:
+                category = "basic"
+
+            # Detect stat types from stats object
+            item_stats = item_data.get("stats", {})
+            stat_types = []
+            for ddragon_key, filter_value in stat_mapping.items():
+                if ddragon_key in item_stats and item_stats[ddragon_key] != 0:
+                    if filter_value not in stat_types:
+                        stat_types.append(filter_value)
+
+            primary_stat = stat_types[0] if stat_types else None
+
+            # Get efficiency - treat 0 as N/A (items without calculable stats)
+            efficiency = item_data.get("gold_efficiency")
+            if efficiency == 0 or efficiency == 0.0:
+                efficiency = None
+
+            formatted_items.append({
+                "id": item_id,
+                "name": item_data.get("name", "Unknown"),
+                "description": item_data.get("plaintext", ""),
+                "gold": gold_total,
+                "image": item_data.get("image_url", get_item_image_url(int(item_id))),
+                "category": category,
+                "stats": item_data.get("plaintext", ""),
+                "stat_type": primary_stat,
+                "stat_types": stat_types,
+                "efficiency": efficiency,
+                "raw_stats": item_stats,
+                "tags": item_data.get("tags", []),
+            })
+
+        return {
+            "success": True,
+            "version": version,
+            "count": len(formatted_items),
+            "items": formatted_items,
+        }
+
+    # =========================================================================
     # TIERLIST ENDPOINT
     # =========================================================================
 
@@ -1022,6 +1138,20 @@ def fetch_tierlist(role: str = None) -> dict:
     """
     client = get_api_client()
     return client.get_tierlist(role=role)
+
+
+def fetch_items(refresh: bool = False) -> dict:
+    """
+    Utility function to fetch all items from API.
+
+    Args:
+        refresh: Force cache refresh on API side
+
+    Returns:
+        dict: Items data with version, count, and items list
+    """
+    client = get_api_client()
+    return client.get_items(refresh=refresh)
 
 
 # =============================================================================

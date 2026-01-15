@@ -539,7 +539,22 @@ tbody tr:last-child td {
 .item-stats {
   font-size: 0.8rem;
   color: var(--text-secondary);
-  line-height: 1.4;
+  line-height: 1.6;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 24px;
+}
+
+.stat-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(137, 180, 250, 0.15);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
 .item-efficiency {
@@ -564,6 +579,11 @@ tbody tr:last-child td {
 .efficiency-low {
   background: rgba(243, 139, 168, 0.2);
   color: var(--danger-color);
+}
+
+.efficiency-na {
+  background: rgba(147, 153, 178, 0.2);
+  color: var(--text-secondary);
 }
 
 /* --- BUILDS SECTION --- */

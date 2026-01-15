@@ -194,9 +194,25 @@
                     </select>
                 </div>
 
+                <div class="control-group">
+                    <label for="item-efficiency"><i class="fas fa-percent"></i> Efficacité</label>
+                    <select id="item-efficiency" onchange="filterItems()">
+                        <option value="all">Toutes</option>
+                        <option value="high">≥100% (Gold Efficient)</option>
+                        <option value="medium">90-99%</option>
+                        <option value="low">&lt;90%</option>
+                    </select>
+                </div>
+
+                <div class="control-separator"></div>
+
                 <div class="control-group search-group">
                     <label for="item-search"><i class="fas fa-search"></i> Recherche</label>
                     <input type="text" id="item-search" placeholder="Chercher un item..." onkeyup="filterItems()">
+                </div>
+
+                <div class="control-group">
+                    <span id="items-patch-version" class="version-badge">Patch ...</span>
                 </div>
             </div>
 

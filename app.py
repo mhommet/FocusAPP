@@ -207,6 +207,17 @@ def get_app_version() -> str:
 
 
 @eel.expose
+def get_ddragon_version() -> str:
+    """
+    Get the current DDragon (patch) version.
+
+    Returns:
+        str: DDragon version string (e.g., "14.10.1")
+    """
+    return data_fetcher.DDRAGON_VER
+
+
+@eel.expose
 def get_champion_tier_list(role: Optional[str] = None) -> dict:
     """
     Fetch tier list from API.
