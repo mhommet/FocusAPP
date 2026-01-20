@@ -30,11 +30,16 @@ Author: Milan Hommet
 License: MIT
 """
 
+import os
 import requests
 import logging
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass
 from enum import Enum
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -43,7 +48,8 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # =============================================================================
 
-API_BASE_URL = "https://api.hommet.ch/api/v1"
+API_BASE_URL = os.getenv("API_URL", "https://api.hommet.ch/api/v1")
+API_KEY = os.getenv("API_KEY")
 DEFAULT_TIMEOUT = 30  # seconds
 RETRY_COUNT = 3
 DDRAGON_VERSION = "14.10.1"  # Updated dynamically at runtime
@@ -418,6 +424,16 @@ class APIServerError(APIError):
     pass
 
 
+class APIUnauthorizedError(APIError):
+    """Raised when API key is missing (401)."""
+    pass
+
+
+class APIForbiddenError(APIError):
+    """Raised when API key is invalid (403)."""
+    pass
+
+
 # =============================================================================
 # RESPONSE MODELS
 # =============================================================================
@@ -492,24 +508,38 @@ class LeagueAPIClient:
     Handles HTTP requests, errors, timeouts, and response parsing.
     """
 
-    def __init__(self, base_url: str = API_BASE_URL, timeout: int = DEFAULT_TIMEOUT):
+    def __init__(
+        self,
+        base_url: str = API_BASE_URL,
+        timeout: int = DEFAULT_TIMEOUT,
+        api_key: str = API_KEY,
+    ):
         """
         Initialize the API client.
 
         Args:
             base_url: Base URL of the API
             timeout: Request timeout in seconds
+            api_key: API key for authentication
         """
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        self.api_key = api_key
         self.session = requests.Session()
-        self.session.headers.update(
-            {
-                "User-Agent": "FocusAPP/1.0",
-                "Accept": "application/json",
-                "Content-Type": "application/json",
-            }
-        )
+
+        headers = {
+            "User-Agent": "FocusAPP/1.0",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+        }
+
+        # Add API key header if configured
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        else:
+            logger.warning("API_KEY not configured. API requests may fail with 401.")
+
+        self.session.headers.update(headers)
 
     def _make_request(
         self, method: str, endpoint: str, params: Optional[dict] = None
@@ -537,7 +567,19 @@ class LeagueAPIClient:
                 )
 
                 # Handle HTTP errors
-                if response.status_code == 404:
+                if response.status_code == 401:
+                    logger.error("API authentication failed: API key missing or not provided")
+                    raise APIUnauthorizedError(
+                        "API key required. Please set API_KEY in your .env file.",
+                        status_code=401,
+                    )
+                elif response.status_code == 403:
+                    logger.error("API authentication failed: Invalid API key")
+                    raise APIForbiddenError(
+                        "Invalid API key. Please check your API_KEY in .env file.",
+                        status_code=403,
+                    )
+                elif response.status_code == 404:
                     raise APINotFoundError(
                         f"Resource not found: {endpoint}", status_code=404
                     )

@@ -5,3 +5,4 @@ certifi>=2023.0.0
 charset_normalizer>=3.0.0
 idna>=3.0
 pyinstaller>=6.15.0
+python-dotenv>=1.0.0
