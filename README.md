@@ -17,6 +17,7 @@
 
 ## Screenshots
 
+![Logo](web/logo.ico)
 ![Tier List View](docs/tierlist.png)
 ![Build View](docs/build.png)
 
@@ -61,13 +62,13 @@ pyinstaller app.spec
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Backend | Python 3.8+, Eel |
-| Frontend | Vanilla JS, HTML5, CSS3 |
+| Component   | Technology                                                        |
+| ----------- | ----------------------------------------------------------------- |
+| Backend     | Python 3.8+, Eel                                                  |
+| Frontend    | Vanilla JS, HTML5, CSS3                                           |
 | Data Source | [api.hommet.ch](https://api.hommet.ch) (Diamond+ aggregated data) |
-| Assets | DDragon, CommunityDragon |
-| Theme | Catppuccin Mocha |
+| Assets      | DDragon, CommunityDragon                                          |
+| Theme       | Catppuccin Mocha                                                  |
 
 ## Project Structure
 
@@ -91,9 +92,9 @@ The application uses a custom API that aggregates Diamond+ data:
 
 ### Endpoints
 
-| Endpoint | Description |
-|----------|-------------|
-| `GET /tierlist` | Fetch tier list with all champions |
+| Endpoint                       | Description                                |
+| ------------------------------ | ------------------------------------------ |
+| `GET /tierlist`                | Fetch tier list with all champions         |
 | `GET /build/{champion}/{role}` | Fetch build for specific champion and role |
 
 ### Example Response (Build)
