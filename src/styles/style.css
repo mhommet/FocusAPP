@@ -1888,6 +1888,98 @@ tbody tr:last-child td {
   height: 350px;
 }
 
+/* =============================================================================
+   STAT SHARDS STYLES
+   ============================================================================= */
+
+.stat-shards-section {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 12px;
+  border: 1px solid rgba(205, 214, 244, 0.05);
+}
+
+.shards-header {
+  margin-bottom: 12px;
+}
+
+.shards-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-weight: 600;
+}
+
+.stat-shards-grid {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.stat-shard-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  background: rgba(17, 17, 27, 0.5);
+  border-radius: 10px;
+  border: 2px solid rgba(205, 214, 244, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  min-width: 60px;
+}
+
+.stat-shard-item:hover {
+  border-color: var(--accent-color);
+  background: rgba(249, 226, 175, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.stat-shard-item .rune-shard {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px;
+  transition: transform 0.2s ease;
+}
+
+.stat-shard-item:hover .rune-shard {
+  transform: scale(1.1);
+}
+
+.shard-row-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+  font-weight: 500;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stat-shards-grid {
+    gap: 10px;
+  }
+  
+  .stat-shard-item {
+    min-width: 50px;
+    padding: 8px;
+  }
+  
+  .stat-shard-item .rune-shard {
+    width: 30px;
+    height: 30px;
+  }
+}
+
 .rune-shards-vertical {
   display: flex !important;
   flex-direction: column !important;
@@ -2291,5 +2383,107 @@ tbody tr:last-child td {
     background: rgba(137, 180, 250, 0.15);
     border: 1px solid rgba(137, 180, 250, 0.3);
     color: #89b4fa;
+}
+
+/* =============================================================================
+   TAURI-SPECIFIC ADDITIONS
+   ============================================================================= */
+
+/* Backend Status Banner */
+.backend-status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, rgba(243, 139, 168, 0.2), rgba(243, 139, 168, 0.1));
+    border: 1px solid rgba(243, 139, 168, 0.5);
+    border-radius: 12px;
+    margin: 0 20px 16px 20px;
+    color: #f38ba8;
+    font-weight: 500;
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+    0%, 100% {
+        box-shadow: 0 0 0 0 rgba(243, 139, 168, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 20px 5px rgba(243, 139, 168, 0.2);
+    }
+}
+
+.backend-status-banner i {
+    font-size: 1.2rem;
+}
+
+.backend-status-banner span {
+    flex: 1;
+}
+
+.retry-btn-small {
+    background: rgba(243, 139, 168, 0.2);
+    border: 1px solid rgba(243, 139, 168, 0.5);
+    color: #f38ba8;
+    padding: 6px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.retry-btn-small:hover {
+    background: rgba(243, 139, 168, 0.3);
+    transform: translateY(-1px);
+}
+
+/* Toast Notifications */
+.toast-notification {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-weight: 500;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: toast-slide-in 0.3s ease-out;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes toast-slide-in {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+.toast-success {
+    background: linear-gradient(135deg, rgba(166, 227, 161, 0.95), rgba(166, 227, 161, 0.85));
+    color: #1e1e2e;
+    border: 1px solid rgba(166, 227, 161, 0.8);
+}
+
+.toast-error {
+    background: linear-gradient(135deg, rgba(243, 139, 168, 0.95), rgba(243, 139, 168, 0.85));
+    color: #1e1e2e;
+    border: 1px solid rgba(243, 139, 168, 0.8);
+}
+
+.toast-info {
+    background: linear-gradient(135deg, rgba(137, 180, 250, 0.95), rgba(137, 180, 250, 0.85));
+    color: #1e1e2e;
+    border: 1px solid rgba(137, 180, 250, 0.8);
 }
 

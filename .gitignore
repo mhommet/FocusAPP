@@ -71,3 +71,7 @@ build_cache_*.json
 # PyInstaller
 # =============================================================================
 *.spec
+
+node_modules/
+.claude
+focusapp_old/

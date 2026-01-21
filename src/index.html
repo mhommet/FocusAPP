@@ -5,11 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FOCUS</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="icon" type="image/png" href="logo.ico">
-    <!-- Inclusion d'eel.js (généré automatiquement par Python) -->
-    <script type="text/javascript" src="/eel.js"></script>
-    <!-- Font Awesome pour les icônes (optionnel mais recommandé) -->
+    <link rel="stylesheet" href="styles/style.css">
+    <link rel="icon" type="image/png" href="assets/logo.ico">
+    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
@@ -37,13 +35,22 @@
             </button>
         </nav>
 
+        <!-- Backend Status Banner (shown if API is down) -->
+        <div id="backend-status" class="backend-status-banner" style="display: none;">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>Backend API is not running. Please start the Rust Axum server on http://localhost:8000</span>
+            <button onclick="retryBackendConnection()" class="retry-btn-small">
+                <i class="fas fa-redo"></i> Retry
+            </button>
+        </div>
+
         <!-- TIER LIST TAB -->
         <div id="tierlist-tab" class="tab-content active">
             <div class="controls-bar">
                 <!-- Role Filter Buttons -->
                 <div class="control-group role-filter-group">
                     <div class="role-filter-inline">
-                        <button class="role-filter-btn-small active" data-role="all" onclick="filterByRole('all')" title="Tous les rôles">
+                        <button class="role-filter-btn-small active" data-role="all" onclick="filterByRole('all')" title="Tous les roles">
                             <i class="fas fa-asterisk"></i>
                         </button>
                         <button class="role-filter-btn-small" data-role="top" onclick="filterByRole('top')" title="Top">
@@ -71,7 +78,7 @@
                     <span id="tierlist-last-update" class="last-update-badge"></span>
                 </div>
 
-                <!-- Recherche -->
+                <!-- Search -->
                 <div class="control-group search-group">
                     <label for="search-input"><i class="fas fa-search"></i> Recherche</label>
                     <input type="text" id="search-input" placeholder="Chercher un champion..." onkeyup="applyFilters()">
@@ -85,7 +92,7 @@
                             <tr>
                                 <th onclick="sortTable('rank')" title="Trier par rang"># <i class="fas fa-sort"></i></th>
                                 <th onclick="sortTable('name')" title="Trier par nom">Champion <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable('role')" title="Trier par rôle">Roles <i class="fas fa-sort"></i></th>
+                                <th onclick="sortTable('role')" title="Trier par role">Roles <i class="fas fa-sort"></i></th>
                                 <th onclick="sortTable('tier')" title="Trier par tier">Tier <i class="fas fa-sort"></i></th>
                                 <th onclick="sortTable('winrate')" title="Trier par winrate">Winrate <i class="fas fa-sort"></i></th>
                                 <th onclick="sortTable('pickrate')" title="Trier par pickrate">Pickrate <i class="fas fa-sort"></i></th>
@@ -110,14 +117,14 @@
                 <div class="control-group">
                     <label for="champion-select"><i class="fas fa-user"></i> Champion</label>
                     <select id="champion-select" onchange="loadChampionBuild()">
-                        <option value="">-- Sélectionner --</option>
+                        <option value="">-- Selectionner --</option>
                     </select>
                 </div>
 
                 <div class="control-separator"></div>
 
                 <div class="control-group">
-                    <label for="role-select"><i class="fas fa-map"></i> Rôle</label>
+                    <label for="role-select"><i class="fas fa-map"></i> Role</label>
                     <select id="role-select" onchange="loadChampionBuild()">
                         <option value="top">Top</option>
                         <option value="jungle">Jungle</option>
@@ -156,10 +163,10 @@
         <div id="items-tab" class="tab-content">
             <div class="controls-bar">
                 <div class="control-group">
-                    <label for="item-category"><i class="fas fa-layer-group"></i> Catégorie</label>
+                    <label for="item-category"><i class="fas fa-layer-group"></i> Categorie</label>
                     <select id="item-category" onchange="filterItems()">
                         <option value="all">Tous les Items</option>
-                        <option value="legendary">Légendaires</option>
+                        <option value="legendary">Legendaires</option>
                         <option value="epic">Epiques</option>
                         <option value="basic">Basiques</option>
                     </select>
@@ -195,12 +202,12 @@
                 </div>
 
                 <div class="control-group">
-                    <label for="item-efficiency"><i class="fas fa-percent"></i> Efficacité</label>
+                    <label for="item-efficiency"><i class="fas fa-percent"></i> Efficacite</label>
                     <select id="item-efficiency" onchange="filterItems()">
                         <option value="all">Toutes</option>
-                        <option value="high">≥100% (Gold Efficient)</option>
+                        <option value="high">>=100% (Gold Efficient)</option>
                         <option value="medium">90-99%</option>
-                        <option value="low">&lt;90%</option>
+                        <option value="low"><90%</option>
                     </select>
                 </div>
 
@@ -219,7 +226,7 @@
             <main>
                 <div class="card">
                     <div id="items-grid" class="items-grid">
-                        <div class="loading-cell">En attente des données...</div>
+                        <div class="loading-cell">En attente des donnees...</div>
                     </div>
                     <!-- Pagination Items -->
                     <div id="items-pagination" class="pagination"></div>
@@ -228,7 +235,7 @@
         </div>
     </div>
 
-    <script src="main.js"></script>
+    <script type="module" src="scripts/main.js"></script>
 </body>
 
 </html>

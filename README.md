@@ -1,164 +1,144 @@
-# FOCUS - League of Legends Companio
+# FocusApp Frontend - Tauri 2.0
 
-> A modern desktop application for viewing champion builds, tier lists, and item data for League of Legends.
+League of Legends Companion Desktop App built with Tauri 2.0.
 
-[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)]()
+## Architecture
 
-## Features
+- **Frontend**: HTML/CSS/JavaScript (ES Modules)
+- **Backend**: External Rust Axum API on `http://localhost:8000`
+- **Desktop**: Tauri 2.0 for native Windows app
 
-- **Live Tier List** - Diamond+ champion rankings with winrates and pickrates
-- **Champion Builds** - Optimized runes, items, skill orders, and summoner spells
-- **Items Database** - Browse all items with stats and gold efficiency
-- **Modern UI** - Clean Catppuccin Mocha theme with glassmorphism effects
-- **Fast & Lightweight** - Built with Python Eel framework
-- **Smart Caching** - Color-coded cache indicators for data freshness
+## Prerequisites
 
-## Screenshots
+1. **Rust** (latest stable): https://rustup.rs/
+2. **Node.js** (18+): https://nodejs.org/
+3. **Backend API**: Rust Axum server running on port 8000
 
-![Logo](web/logo.ico)
-![Tier List View](docs/tierlist.png)
-![Build View](docs/build.png)
-
-## Installation
-
-### Prerequisites
-
-- Python 3.8 or higher
-- pip (Python package manager)
-
-### Quick Start
+## Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/milanhommet/FocusAPP.git
-cd FocusAPP
-
 # Install dependencies
-pip install -r requirements.txt
+npm install
 
-# Run the application
-python app.py
+# Development mode (hot reload)
+npm run dev
+
+# Build production MSI
+npm run build
+# Output: src-tauri/target/release/bundle/msi/FocusApp_1.0.0_x64_en-US.msi
 ```
-
-### Build Executable (Optional)
-
-```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Build standalone executable
-pyinstaller app.spec
-```
-
-## Usage
-
-1. **Launch the application** - Run `python app.py`
-2. **Browse Tier List** - View Diamond+ champion rankings
-3. **Search Champions** - Filter by role or search by name
-4. **View Builds** - Select a champion and role to see optimal builds
-5. **Refresh Data** - Click refresh to get the latest statistics
-
-## Tech Stack
-
-| Component   | Technology                                                        |
-| ----------- | ----------------------------------------------------------------- |
-| Backend     | Python 3.8+, Eel                                                  |
-| Frontend    | Vanilla JS, HTML5, CSS3                                           |
-| Data Source | [api.hommet.ch](https://api.hommet.ch) (Diamond+ aggregated data) |
-| Assets      | DDragon, CommunityDragon                                          |
-| Theme       | Catppuccin Mocha                                                  |
 
 ## Project Structure
 
 ```
-FocusAPP/
-├── app.py              # Main Eel application entry point
-├── api_client.py       # API client for fetching data
-├── data_fetcher.py     # Data fetching and formatting
-├── riot_api.py         # Riot API utilities (optional)
-├── requirements.txt    # Python dependencies
-├── web/
-│   ├── index.html      # Main HTML page
-│   ├── main.js         # Frontend JavaScript
-│   └── style.css       # Catppuccin Mocha styles
-└── README.md
+focusapp-frontend/
+├── src/                          # Frontend assets
+│   ├── index.html               # Main HTML page
+│   ├── scripts/
+│   │   ├── api.js               # HTTP client for Axum API
+│   │   └── main.js              # Main application logic
+│   ├── styles/
+│   │   └── style.css            # Catppuccin theme
+│   └── assets/
+│       └── logo.ico
+├── src-tauri/                    # Tauri backend
+│   ├── src/
+│   │   └── main.rs              # Minimal Tauri entry point
+│   ├── Cargo.toml
+│   ├── tauri.conf.json          # Tauri configuration
+│   └── capabilities/
+│       └── default.json         # HTTP permissions
+└── package.json
 ```
 
-## API Reference
+## API Endpoints
 
-The application uses a custom API that aggregates Diamond+ data:
+All API calls go to `http://localhost:8000/api/v1/`:
 
-### Endpoints
+| Endpoint | Description |
+|----------|-------------|
+| `GET /tierlist?role={role}` | Champion tier list (Diamond+) |
+| `GET /build/{champion}/{role}` | Champion build data |
+| `GET /items` | All items with gold efficiency |
+| `GET /health` | Backend health check |
 
-| Endpoint                       | Description                                |
-| ------------------------------ | ------------------------------------------ |
-| `GET /tierlist`                | Fetch tier list with all champions         |
-| `GET /build/{champion}/{role}` | Fetch build for specific champion and role |
+## Running the App
 
-### Example Response (Build)
+### Development
+
+1. Start the backend API:
+   ```bash
+   cd focusapp-api
+   cargo run --release
+   ```
+
+2. Start the frontend:
+   ```bash
+   cd focusapp-frontend
+   npm run dev
+   ```
+
+### Production Build
+
+```bash
+npm run build
+```
+
+Output: `src-tauri/target/release/bundle/msi/FocusApp_1.0.0_x64_en-US.msi`
+
+## Key Differences from EEL Version
+
+| Aspect | Python EEL | Tauri 2.0 |
+|--------|-----------|-----------|
+| Communication | `eel.function()()` | HTTP `fetch()` |
+| Backend | Python integrated | External Rust API |
+| Permissions | Implicit | Explicit HTTP scope |
+| Bundle size | ~150MB | ~10MB |
+| Startup time | 2-3s | <1s |
+
+## Configuration
+
+### HTTP Scope (tauri.conf.json)
 
 ```json
 {
-  "champion": "jinx",
-  "role": "adc",
-  "rank": "MASTER",
-  "build": {
-    "runes": { ... },
-    "items": { "core": [...], "boots": 3006, "starting": [...] },
-    "skill_order": { "priority": "Q>W>E" },
-    "summoner_spells": { "ids": [4, 7] },
-    "stats": { "winrate": 52.5, "games_analyzed": 15000 }
+  "plugins": {
+    "http": {
+      "scope": {
+        "allow": [
+          { "url": "http://localhost:8000/**" },
+          { "url": "https://ddragon.leagueoflegends.com/**" },
+          { "url": "https://raw.communitydragon.org/**" }
+        ]
+      }
+    }
   }
 }
 ```
 
-## Configuration
+### CSP (Content Security Policy)
 
-No configuration required! The app automatically:
+The app is configured with strict CSP allowing only:
+- Self-hosted scripts and styles
+- Images from DDragon and CommunityDragon
+- API connections to localhost:8000
 
-- Detects the latest game version from DDragon
-- Fetches fresh data from the API
-- Caches builds for better performance
+## Troubleshooting
 
-## Contributing
+### "Backend API is not running"
 
-Contributions are welcome! Please ensure:
-
-1. Code follows PEP 8 (Python) and standard JS conventions
-2. All functions have docstrings/JSDoc comments
-3. Comments are in English
-4. No console.log or debug prints in production code
-
-### Development Setup
-
+Ensure the Rust Axum server is running:
 ```bash
-# Install development dependencies
-pip install black pylint
-
-# Format code
-black . --line-length 100
-
-# Check for issues
-pylint *.py
+cd focusapp-api
+cargo run --release
 ```
+
+### Build fails
+
+1. Install Rust: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+2. Install Visual Studio Build Tools (Windows)
+3. Restart terminal and retry
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- **Data Source**: [api.hommet.ch](https://api.hommet.ch) for Diamond+ aggregated statistics
-- **Assets**: Riot Games DDragon and CommunityDragon
-- **Icons**: Font Awesome
-- **Theme**: [Catppuccin Mocha](https://github.com/catppuccin/catppuccin)
-
-## Disclaimer
-
-FOCUS isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.
-
----
-
-Made with love by [Milan Hommet](https://github.com/milanhommet)
+MIT

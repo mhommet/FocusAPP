@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Default capabilities for FocusApp",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.hommet.ch/**" },
+        { "url": "https://ddragon.leagueoflegends.com/**" },
+        { "url": "https://raw.communitydragon.org/**" }
+      ]
+    }
+  ]
+}
