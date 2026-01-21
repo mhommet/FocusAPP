@@ -1,14 +1,53 @@
 # =============================================================================
-# Python
+# TAURI - RUST
 # =============================================================================
+
+# Rust build artifacts
+src-tauri/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo lock (keep for applications, ignore for libraries)
+# src-tauri/Cargo.lock
+
+# =============================================================================
+# FRONTEND - NODE.JS
+# =============================================================================
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Build output
+dist/
+dist-ssr/
+build/
+out/
+
+# =============================================================================
+# TAURI BUILD OUTPUTS
+# =============================================================================
+
+# Tauri bundled apps
+src-tauri/target/release/bundle/
+src-tauri/target/debug/bundle/
+
+# WiX toolset files (Windows installer)
+*.wixobj
+*.wixpdb
+
+# =============================================================================
+# PYTHON (API Backend)
+# =============================================================================
+
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-build/
 develop-eggs/
-dist/
 downloads/
 eggs/
 .eggs/
@@ -28,50 +67,163 @@ venv/
 env/
 ENV/
 .venv/
+venv.bak/
+
+# PyInstaller
+*.spec
 
 # =============================================================================
-# IDE & Editors
+# IDE & EDITORS
 # =============================================================================
+
+# VSCode
 .vscode/
+*.code-workspace
+
+# JetBrains IDEs
 .idea/
+*.iml
+*.iws
+
+# Vim
 *.swp
 *.swo
 *~
-.DS_Store
-Thumbs.db
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
 
 # =============================================================================
-# Logs & Cache
+# OS FILES
 # =============================================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+.Trash-*
+
+# =============================================================================
+# LOGS & CACHE
+# =============================================================================
+
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
 .cache/
 *.cache
+.temp/
+tmp/
 tmpclaude*
 
 # =============================================================================
-# Environment & Secrets
+# ENVIRONMENT & SECRETS
 # =============================================================================
+
 .env
 .env.local
 .env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 config.json
 secrets.json
 settings.local.json
+.secrets
+
+# API keys
+*.key
+*.pem
 
 # =============================================================================
-# Application Specific
+# DATABASE
 # =============================================================================
-lockfile
+
 *.db
 *.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+
+# PostgreSQL
+*.backup
+*.dump
+
+# =============================================================================
+# APPLICATION SPECIFIC
+# =============================================================================
+
+lockfile
 build_cache_*.json
 
-# =============================================================================
-# PyInstaller
-# =============================================================================
-*.spec
+# Claude artifacts
+.claude/
 
-node_modules/
-.claude
+# Old versions
 focusapp_old/
+backup/
+old/
+
+# Test coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# =============================================================================
+# TEMPORARY FILES
+# =============================================================================
+
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# =============================================================================
+# TAURI SPECIFIC IGNORE PATTERNS
+# =============================================================================
+
+# Debug symbols
+*.dSYM/
+
+# Installer artifacts
+*.msi
+*.exe
+*.dmg
+*.app
+*.deb
+*.rpm
+*.AppImage
+
+# Code signing
+*.p12
+*.mobileprovision
+*.provisionprofile
+
+# =============================================================================
+# GIT LFS (Large File Storage)
+# =============================================================================
+
+# If you need to track large files, uncomment and configure:
+# *.psd filter=lfs diff=lfs merge=lfs -text
+# *.ai filter=lfs diff=lfs merge=lfs -text
