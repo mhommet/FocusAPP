@@ -18,13 +18,13 @@ const { fetch } = window.__TAURI__.http;
 // CONFIGURATION
 // =============================================================================
 
-const API_BASE_URL = 'https://api.hommet.ch/api/v1';
-const DDRAGON_BASE_URL = 'https://ddragon.leagueoflegends.com';
+const API_BASE_URL = "https://api.hommet.ch/api/v1";
+const DDRAGON_BASE_URL = "https://ddragon.leagueoflegends.com";
 const DEFAULT_TIMEOUT = 30; // seconds
 const RETRY_COUNT = 3;
 
 // Cache for DDragon version
-let cachedDDragonVersion = '14.10.1';
+let cachedDDragonVersion = "14.10.1";
 
 // =============================================================================
 // GENERIC API WRAPPER
@@ -40,38 +40,44 @@ let cachedDDragonVersion = '14.10.1';
  * @throws {Error} On API error after all retries
  */
 async function apiCall(endpoint, options = {}, retries = RETRY_COUNT) {
-    const url = `${API_BASE_URL}${endpoint}`;
+  const url = `${API_BASE_URL}${endpoint}`;
 
-    for (let attempt = 0; attempt < retries; attempt++) {
-        try {
-            const response = await fetch(url, {
-                method: options.method || 'GET',
-                timeout: { secs: options.timeout || DEFAULT_TIMEOUT, nanos: 0 },
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                    ...options.headers
-                }
-            });
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: options.method || "GET",
+        timeout: { secs: options.timeout || DEFAULT_TIMEOUT, nanos: 0 },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...options.headers,
+        },
+      });
 
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`API Error ${response.status}: ${errorText}`);
-            }
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API Error ${response.status}: ${errorText}`);
+      }
 
-            return await response.json();
-        } catch (error) {
-            console.warn(`[API] Attempt ${attempt + 1}/${retries} failed for ${endpoint}:`, error.message);
+      return await response.json();
+    } catch (error) {
+      console.warn(
+        `[API] Attempt ${attempt + 1}/${retries} failed for ${endpoint}:`,
+        error.message,
+      );
 
-            if (attempt === retries - 1) {
-                console.error(`[API] Failed ${endpoint} after ${retries} attempts:`, error);
-                throw error;
-            }
+      if (attempt === retries - 1) {
+        console.error(
+          `[API] Failed ${endpoint} after ${retries} attempts:`,
+          error,
+        );
+        throw error;
+      }
 
-            // Exponential backoff
-            await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-        }
+      // Exponential backoff
+      await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
     }
+  }
 }
 
 /**
@@ -81,23 +87,23 @@ async function apiCall(endpoint, options = {}, retries = RETRY_COUNT) {
  * @returns {Promise<Object>} Parsed JSON response
  */
 async function ddragonCall(endpoint) {
-    const url = `${DDRAGON_BASE_URL}${endpoint}`;
+  const url = `${DDRAGON_BASE_URL}${endpoint}`;
 
-    try {
-        const response = await fetch(url, {
-            method: 'GET',
-            timeout: { secs: 10, nanos: 0 }
-        });
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      timeout: { secs: 10, nanos: 0 },
+    });
 
-        if (!response.ok) {
-            throw new Error(`DDragon Error ${response.status}`);
-        }
-
-        return await response.json();
-    } catch (error) {
-        console.error(`[DDragon] Failed to fetch ${endpoint}:`, error);
-        throw error;
+    if (!response.ok) {
+      throw new Error(`DDragon Error ${response.status}`);
     }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`[DDragon] Failed to fetch ${endpoint}:`, error);
+    throw error;
+  }
 }
 
 // =============================================================================
@@ -111,16 +117,16 @@ async function ddragonCall(endpoint) {
  * @returns {Promise<string>} DDragon version string
  */
 export async function getDDragonVersion() {
-    try {
-        const versions = await ddragonCall('/api/versions.json');
-        if (versions && versions.length > 0) {
-            cachedDDragonVersion = versions[0];
-        }
-        return cachedDDragonVersion;
-    } catch (error) {
-        console.warn('[DDragon] Using cached version:', cachedDDragonVersion);
-        return cachedDDragonVersion;
+  try {
+    const versions = await ddragonCall("/api/versions.json");
+    if (versions && versions.length > 0) {
+      cachedDDragonVersion = versions[0];
     }
+    return cachedDDragonVersion;
+  } catch (error) {
+    console.warn("[DDragon] Using cached version:", cachedDDragonVersion);
+    return cachedDDragonVersion;
+  }
 }
 
 /**
@@ -129,25 +135,25 @@ export async function getDDragonVersion() {
  * @returns {Promise<Array>} List of champion objects
  */
 export async function getChampionList() {
-    try {
-        const version = await getDDragonVersion();
-        const data = await ddragonCall(`/cdn/${version}/data/en_US/champion.json`);
+  try {
+    const version = await getDDragonVersion();
+    const data = await ddragonCall(`/cdn/${version}/data/en_US/champion.json`);
 
-        const champions = Object.values(data.data).map(champ => ({
-            id: champ.id,
-            key: champ.key,
-            name: champ.name,
-            image: `${DDRAGON_BASE_URL}/cdn/${version}/img/champion/${champ.image.full}`
-        }));
+    const champions = Object.values(data.data).map((champ) => ({
+      id: champ.id,
+      key: champ.key,
+      name: champ.name,
+      image: `${DDRAGON_BASE_URL}/cdn/${version}/img/champion/${champ.image.full}`,
+    }));
 
-        // Sort alphabetically
-        champions.sort((a, b) => a.name.localeCompare(b.name));
+    // Sort alphabetically
+    champions.sort((a, b) => a.name.localeCompare(b.name));
 
-        return champions;
-    } catch (error) {
-        console.error('[DDragon] Failed to fetch champion list:', error);
-        return [];
-    }
+    return champions;
+  } catch (error) {
+    console.error("[DDragon] Failed to fetch champion list:", error);
+    return [];
+  }
 }
 
 // =============================================================================
@@ -162,23 +168,23 @@ export async function getChampionList() {
  * @returns {Promise<Object>} Tier list data
  */
 export async function getTierlist(role = null) {
-    const params = role ? `?role=${role.toLowerCase()}` : '';
+  const params = role ? `?role=${role.toLowerCase()}` : "";
 
-    try {
-        const data = await apiCall(`/tierlist${params}`);
-        return formatTierlistResponse(data, role);
-    } catch (error) {
-        console.error('[API] Tierlist error:', error);
-        return {
-            success: false,
-            error: error.message,
-            tier_list: { S: [], A: [], B: [], C: [], D: [] },
-            counts: { S: 0, A: 0, B: 0, C: 0, D: 0 },
-            total_champions: 0,
-            last_update: null,
-            champions: []
-        };
-    }
+  try {
+    const data = await apiCall(`/tierlist${params}`);
+    return formatTierlistResponse(data, role);
+  } catch (error) {
+    console.error("[API] Tierlist error:", error);
+    return {
+      success: false,
+      error: error.message,
+      tier_list: { S: [], A: [], B: [], C: [], D: [] },
+      counts: { S: 0, A: 0, B: 0, C: 0, D: 0 },
+      total_champions: 0,
+      last_update: null,
+      champions: [],
+    };
+  }
 }
 
 /**
@@ -189,80 +195,87 @@ export async function getTierlist(role = null) {
  * @returns {Object} Formatted tier list
  */
 function formatTierlistResponse(data, filteredRole = null) {
-    const tierList = data.tier_list || {};
-    const formattedTiers = {};
-    const flatList = [];
-    let rankCounter = 1;
+  const tierList = data.tier_list || {};
+  const formattedTiers = {};
+  const flatList = [];
+  let rankCounter = 1;
 
-    for (const tier of ['S', 'A', 'B', 'C', 'D']) {
-        const tierChampions = tierList[tier] || [];
-        formattedTiers[tier] = [];
+  for (const tier of ["S", "A", "B", "C", "D"]) {
+    const tierChampions = tierList[tier] || [];
+    formattedTiers[tier] = [];
 
-        for (const champ of tierChampions) {
-            const championName = champ.champion || 'Unknown';
-            const roles = champ.roles || [];
+    for (const champ of tierChampions) {
+      const championName = champ.champion || "Unknown";
+      const roles = champ.roles || [];
 
-            // Format winrate and pickrate
-            const winrate = champ.winrate;
-            const winrateStr = winrate !== null && winrate !== undefined
-                ? `${winrate.toFixed(1)}%` : '-';
+      // Format winrate and pickrate
+      const winrate = champ.winrate;
+      const winrateStr =
+        winrate !== null && winrate !== undefined
+          ? `${winrate.toFixed(1)}%`
+          : "-";
 
-            const pickrate = champ.pickrate;
-            const pickrateStr = pickrate !== null && pickrate !== undefined
-                ? `${pickrate.toFixed(1)}%` : '-';
+      const pickrate = champ.pickrate;
+      const pickrateStr =
+        pickrate !== null && pickrate !== undefined
+          ? `${pickrate.toFixed(1)}%`
+          : "-";
 
-            // Determine display role
-            let displayRole;
-            if (filteredRole) {
-                displayRole = filteredRole.charAt(0).toUpperCase() + filteredRole.slice(1);
-            } else if (champ.role) {
-                displayRole = champ.role.charAt(0).toUpperCase() + champ.role.slice(1);
-            } else if (roles.length > 0) {
-                displayRole = roles.map(r => r.charAt(0).toUpperCase() + r.slice(1)).join(', ');
-            } else {
-                displayRole = 'Flex';
-            }
+      // Determine display role
+      let displayRole;
+      if (filteredRole) {
+        displayRole =
+          filteredRole.charAt(0).toUpperCase() + filteredRole.slice(1);
+      } else if (champ.role) {
+        displayRole = champ.role.charAt(0).toUpperCase() + champ.role.slice(1);
+      } else if (roles.length > 0) {
+        displayRole = roles
+          .map((r) => r.charAt(0).toUpperCase() + r.slice(1))
+          .join(", ");
+      } else {
+        displayRole = "Flex";
+      }
 
-            const formattedEntry = {
-                champion: championName,
-                name: championName.charAt(0).toUpperCase() + championName.slice(1),
-                tier: tier,
-                winrate: winrate,
-                winrate_str: winrateStr,
-                pickrate: pickrate,
-                pickrate_str: pickrateStr,
-                games_analyzed: champ.games_analyzed || 0,
-                roles: roles,
-                roles_str: displayRole,
-                performance_score: champ.performance_score || 0,
-                image: `${DDRAGON_BASE_URL}/cdn/${cachedDDragonVersion}/img/champion/${championName}.png`
-            };
+      const formattedEntry = {
+        champion: championName,
+        name: championName.charAt(0).toUpperCase() + championName.slice(1),
+        tier: tier,
+        winrate: winrate,
+        winrate_str: winrateStr,
+        pickrate: pickrate,
+        pickrate_str: pickrateStr,
+        games_analyzed: champ.games_analyzed || 0,
+        roles: roles,
+        roles_str: displayRole,
+        performance_score: champ.performance_score || 0,
+        image: `${DDRAGON_BASE_URL}/cdn/${cachedDDragonVersion}/img/champion/${championName}.png`,
+      };
 
-            formattedTiers[tier].push(formattedEntry);
+      formattedTiers[tier].push(formattedEntry);
 
-            // Add to flat list for table display
-            flatList.push({
-                rank: String(rankCounter),
-                name: formattedEntry.name,
-                role: displayRole,
-                tier: tier,
-                winrate: winrateStr,
-                pickrate: pickrateStr,
-                games: champ.games_analyzed || 0
-            });
-            rankCounter++;
-        }
+      // Add to flat list for table display
+      flatList.push({
+        rank: String(rankCounter),
+        name: formattedEntry.name,
+        role: displayRole,
+        tier: tier,
+        winrate: winrateStr,
+        pickrate: pickrateStr,
+        games: champ.games_analyzed || 0,
+      });
+      rankCounter++;
     }
+  }
 
-    return {
-        success: true,
-        rank: data.rank || 'MASTER',
-        tier_list: formattedTiers,
-        counts: data.counts || { S: 0, A: 0, B: 0, C: 0, D: 0 },
-        total_champions: data.total_champions || 0,
-        last_update: data.last_update,
-        champions: flatList
-    };
+  return {
+    success: true,
+    rank: data.rank || "MASTER",
+    tier_list: formattedTiers,
+    counts: data.counts || { S: 0, A: 0, B: 0, C: 0, D: 0 },
+    total_champions: data.total_champions || 0,
+    last_update: data.last_update,
+    champions: flatList,
+  };
 }
 
 // =============================================================================
@@ -278,23 +291,30 @@ function formatTierlistResponse(data, filteredRole = null) {
  * @param {boolean} forceRefresh - Force cache refresh
  * @returns {Promise<Object>} Build data
  */
-export async function getChampionBuild(championName, role = 'default', forceRefresh = false) {
-    // Normalize champion name for URL (lowercase, no spaces/special chars)
-    const champNormalized = championName.toLowerCase()
-        .replace(/\s+/g, '')
-        .replace(/'/g, '')
-        .replace(/\./g, '');
+export async function getChampionBuild(
+  championName,
+  role = "default",
+  forceRefresh = false,
+) {
+  // Normalize champion name for URL (lowercase, no spaces/special chars)
+  const champNormalized = championName
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/'/g, "")
+    .replace(/\./g, "");
 
-    const roleNormalized = role.toLowerCase();
-    const params = forceRefresh ? '?force_refresh=true' : '';
+  const roleNormalized = role.toLowerCase();
+  const params = forceRefresh ? "?force_refresh=true" : "";
 
-    try {
-        const data = await apiCall(`/build/${champNormalized}/${roleNormalized}${params}`);
-        return formatBuildResponse(data, championName, role);
-    } catch (error) {
-        console.error('[API] Build error:', error);
-        return makeErrorResponse(error.message, championName, role);
-    }
+  try {
+    const data = await apiCall(
+      `/build/${champNormalized}/${roleNormalized}${params}`,
+    );
+    return formatBuildResponse(data, championName, role);
+  } catch (error) {
+    console.error("[API] Build error:", error);
+    return makeErrorResponse(error.message, championName, role);
+  }
 }
 
 /**
@@ -595,38 +615,46 @@ function formatBuildResponse(data, champion, role) {
  * Get spell ID from spell name.
  */
 function getSpellIdFromName(spellName) {
-    const spellNameToId = {
-        'Cleanse': 1, 'Exhaust': 3, 'Flash': 4, 'Ghost': 6, 'Heal': 7,
-        'Smite': 11, 'Teleport': 12, 'Clarity': 13, 'Ignite': 14,
-        'Barrier': 21, 'Mark': 32
-    };
-    return spellNameToId[spellName] || 4; // Default to Flash
+  const spellNameToId = {
+    Cleanse: 1,
+    Exhaust: 3,
+    Flash: 4,
+    Ghost: 6,
+    Heal: 7,
+    Smite: 11,
+    Teleport: 12,
+    Clarity: 13,
+    Ignite: 14,
+    Barrier: 21,
+    Mark: 32,
+  };
+  return spellNameToId[spellName] || 4; // Default to Flash
 }
 
 /**
  * Create a standardized error response.
  */
 function makeErrorResponse(errorMsg, champion, role) {
-    return {
-        success: false,
-        error: errorMsg,
-        champion: champion,
-        role: role,
-        runes: {
-            keystone_icon: null,
-            primary: [],
-            secondary: [],
-            shards: []
-        },
-        items: { starting: [], core: [], boots: null },
-        skills: { order: [], priority: '' },
-        summoners: [],
-        winrate: null,
-        pickrate: null,
-        games: null,
-        cached: false,
-        cache_age_hours: null
-    };
+  return {
+    success: false,
+    error: errorMsg,
+    champion: champion,
+    role: role,
+    runes: {
+      keystone_icon: null,
+      primary: [],
+      secondary: [],
+      shards: [],
+    },
+    items: { starting: [], core: [], boots: null },
+    skills: { order: [], priority: "" },
+    summoners: [],
+    winrate: null,
+    pickrate: null,
+    games: null,
+    cached: false,
+    cache_age_hours: null,
+  };
 }
 
 // =============================================================================
@@ -640,20 +668,20 @@ function makeErrorResponse(errorMsg, champion, role) {
  * @returns {Promise<Array>} List of item objects
  */
 export async function getItemsData(refresh = false) {
-    const params = refresh ? '?refresh=true' : '';
+  const params = refresh ? "?refresh=true" : "";
 
-    try {
-        const data = await apiCall(`/items${params}`);
-        const items = formatItemsResponse(data);
-        if (items.length > 0) {
-            return items;
-        }
-        console.warn('[API] Items API returned empty, falling back to DDragon');
-        return await fetchItemsFromDDragon();
-    } catch (error) {
-        console.error('[API] Items error, falling back to DDragon:', error);
-        return await fetchItemsFromDDragon();
+  try {
+    const data = await apiCall(`/items${params}`);
+    const items = formatItemsResponse(data);
+    if (items.length > 0) {
+      return items;
     }
+    console.warn("[API] Items API returned empty, falling back to DDragon");
+    return await fetchItemsFromDDragon();
+  } catch (error) {
+    console.error("[API] Items error, falling back to DDragon:", error);
+    return await fetchItemsFromDDragon();
+  }
 }
 
 /**
@@ -661,185 +689,188 @@ export async function getItemsData(refresh = false) {
  * Used when the backend API is unavailable.
  */
 async function fetchItemsFromDDragon() {
-    try {
-        const version = await getDDragonVersion();
-        const url = `${DDRAGON_BASE_URL}/cdn/${version}/data/en_US/item.json`;
+  try {
+    const version = await getDDragonVersion();
+    const url = `${DDRAGON_BASE_URL}/cdn/${version}/data/en_US/item.json`;
 
-        const response = await fetch(url, {
-            method: 'GET',
-            timeout: { secs: 15, nanos: 0 }
-        });
+    const response = await fetch(url, {
+      method: "GET",
+      timeout: { secs: 15, nanos: 0 },
+    });
 
-        if (!response.ok) {
-            throw new Error(`DDragon error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        const items = [];
-
-        // Gold values for efficiency calculation (from old Python app)
-        const GOLD_VALUES = {
-            "FlatPhysicalDamageMod": 35,
-            "FlatMagicDamageMod": 21.75,
-            "FlatArmorMod": 20,
-            "FlatSpellBlockMod": 18,
-            "FlatHPPoolMod": 2.67,
-            "FlatMPPoolMod": 1.4,
-            "PercentAttackSpeedMod": 2500,
-            "FlatCritChanceMod": 4000,
-            "FlatMovementSpeedMod": 12,
-            "PercentMovementSpeedMod": 3950,
-            "FlatHPRegenMod": 36,
-            "FlatMPRegenMod": 50,
-            "PercentLifeStealMod": 2750
-        };
-
-        // Stat mapping for filters
-        const statMapping = {
-            'FlatPhysicalDamageMod': 'ad',
-            'FlatMagicDamageMod': 'ap',
-            'FlatHPPoolMod': 'health',
-            'FlatArmorMod': 'armor',
-            'FlatSpellBlockMod': 'mr',
-            'PercentAttackSpeedMod': 'as',
-            'FlatCritChanceMod': 'crit'
-        };
-
-        for (const [itemId, itemData] of Object.entries(data.data)) {
-            const goldData = itemData.gold || {};
-            const goldTotal = goldData.total || 0;
-
-            // Skip non-purchasable or zero-price items
-            if (goldData.purchasable === false || goldTotal <= 0) continue;
-
-            // Calculate gold efficiency
-            const itemStats = itemData.stats || {};
-            let totalStatValue = 0;
-            for (const [statKey, statValue] of Object.entries(itemStats)) {
-                if (GOLD_VALUES[statKey] && statValue !== 0) {
-                    totalStatValue += statValue * GOLD_VALUES[statKey];
-                }
-            }
-            const efficiency = totalStatValue > 0 ? Math.round((totalStatValue / goldTotal) * 1000) / 10 : null;
-
-            // Determine category
-            let category = 'basic';
-            if (goldTotal >= 2500) category = 'legendary';
-            else if (goldTotal >= 1000) category = 'epic';
-
-            // Detect stat types
-            const statTypes = [];
-            for (const [ddragonKey, filterValue] of Object.entries(statMapping)) {
-                if (itemStats[ddragonKey] && itemStats[ddragonKey] !== 0) {
-                    if (!statTypes.includes(filterValue)) statTypes.push(filterValue);
-                }
-            }
-
-            items.push({
-                id: itemId,
-                name: itemData.name || 'Unknown',
-                description: itemData.plaintext || '',
-                gold: goldTotal,
-                image: `${DDRAGON_BASE_URL}/cdn/${version}/img/item/${itemData.image.full}`,
-                category: category,
-                stats: itemData.plaintext || '',
-                stat_type: statTypes[0] || null,
-                stat_types: statTypes,
-                efficiency: efficiency,
-                raw_stats: itemStats,
-                tags: itemData.tags || []
-            });
-        }
-
-        console.log(`[DDragon] Loaded ${items.length} items directly`);
-        return items;
-    } catch (error) {
-        console.error('[DDragon] Failed to fetch items:', error);
-        return [];
+    if (!response.ok) {
+      throw new Error(`DDragon error: ${response.status}`);
     }
+
+    const data = await response.json();
+    const items = [];
+
+    // Gold values for efficiency calculation (from old Python app)
+    const GOLD_VALUES = {
+      FlatPhysicalDamageMod: 35,
+      FlatMagicDamageMod: 21.75,
+      FlatArmorMod: 20,
+      FlatSpellBlockMod: 18,
+      FlatHPPoolMod: 2.67,
+      FlatMPPoolMod: 1.4,
+      PercentAttackSpeedMod: 2500,
+      FlatCritChanceMod: 4000,
+      FlatMovementSpeedMod: 12,
+      PercentMovementSpeedMod: 3950,
+      FlatHPRegenMod: 36,
+      FlatMPRegenMod: 50,
+      PercentLifeStealMod: 2750,
+    };
+
+    // Stat mapping for filters
+    const statMapping = {
+      FlatPhysicalDamageMod: "ad",
+      FlatMagicDamageMod: "ap",
+      FlatHPPoolMod: "health",
+      FlatArmorMod: "armor",
+      FlatSpellBlockMod: "mr",
+      PercentAttackSpeedMod: "as",
+      FlatCritChanceMod: "crit",
+    };
+
+    for (const [itemId, itemData] of Object.entries(data.data)) {
+      const goldData = itemData.gold || {};
+      const goldTotal = goldData.total || 0;
+
+      // Skip non-purchasable or zero-price items
+      if (goldData.purchasable === false || goldTotal <= 0) continue;
+
+      // Calculate gold efficiency
+      const itemStats = itemData.stats || {};
+      let totalStatValue = 0;
+      for (const [statKey, statValue] of Object.entries(itemStats)) {
+        if (GOLD_VALUES[statKey] && statValue !== 0) {
+          totalStatValue += statValue * GOLD_VALUES[statKey];
+        }
+      }
+      const efficiency =
+        totalStatValue > 0
+          ? Math.round((totalStatValue / goldTotal) * 1000) / 10
+          : null;
+
+      // Determine category
+      let category = "basic";
+      if (goldTotal >= 2500) category = "legendary";
+      else if (goldTotal >= 1000) category = "epic";
+
+      // Detect stat types
+      const statTypes = [];
+      for (const [ddragonKey, filterValue] of Object.entries(statMapping)) {
+        if (itemStats[ddragonKey] && itemStats[ddragonKey] !== 0) {
+          if (!statTypes.includes(filterValue)) statTypes.push(filterValue);
+        }
+      }
+
+      items.push({
+        id: itemId,
+        name: itemData.name || "Unknown",
+        description: itemData.plaintext || "",
+        gold: goldTotal,
+        image: `${DDRAGON_BASE_URL}/cdn/${version}/img/item/${itemData.image.full}`,
+        category: category,
+        stats: itemData.plaintext || "",
+        stat_type: statTypes[0] || null,
+        stat_types: statTypes,
+        efficiency: efficiency,
+        raw_stats: itemStats,
+        tags: itemData.tags || [],
+      });
+    }
+
+    console.log(`[DDragon] Loaded ${items.length} items directly`);
+    return items;
+  } catch (error) {
+    console.error("[DDragon] Failed to fetch items:", error);
+    return [];
+  }
 }
 
 /**
  * Format items response for frontend display.
  */
 function formatItemsResponse(data) {
-    if (!data.success) {
-        return [];
+  if (!data.success) {
+    return [];
+  }
+
+  const version = data.version || cachedDDragonVersion;
+  if (data.version) {
+    cachedDDragonVersion = data.version;
+  }
+
+  const rawItems = data.items || {};
+  const formattedItems = [];
+
+  // Stat mapping
+  const statMapping = {
+    FlatPhysicalDamageMod: "ad",
+    FlatMagicDamageMod: "ap",
+    FlatHPPoolMod: "health",
+    PercentHPPoolMod: "health",
+    FlatArmorMod: "armor",
+    FlatSpellBlockMod: "mr",
+    PercentAttackSpeedMod: "as",
+    FlatCritChanceMod: "crit",
+  };
+
+  for (const [itemId, itemData] of Object.entries(rawItems)) {
+    const goldData = itemData.gold || {};
+    const goldTotal = goldData.total || 0;
+
+    // Skip non-purchasable items
+    if (!goldData.purchasable) continue;
+
+    // Determine category
+    let category;
+    if (goldTotal >= 2500) {
+      category = "legendary";
+    } else if (goldTotal >= 1000) {
+      category = "epic";
+    } else {
+      category = "basic";
     }
 
-    const version = data.version || cachedDDragonVersion;
-    if (data.version) {
-        cachedDDragonVersion = data.version;
+    // Detect stat types
+    const itemStats = itemData.stats || {};
+    const statTypes = [];
+    for (const [ddragonKey, filterValue] of Object.entries(statMapping)) {
+      if (itemStats[ddragonKey] && itemStats[ddragonKey] !== 0) {
+        if (!statTypes.includes(filterValue)) {
+          statTypes.push(filterValue);
+        }
+      }
     }
 
-    const rawItems = data.items || {};
-    const formattedItems = [];
+    const primaryStat = statTypes[0] || null;
 
-    // Stat mapping
-    const statMapping = {
-        'FlatPhysicalDamageMod': 'ad',
-        'FlatMagicDamageMod': 'ap',
-        'FlatHPPoolMod': 'health',
-        'PercentHPPoolMod': 'health',
-        'FlatArmorMod': 'armor',
-        'FlatSpellBlockMod': 'mr',
-        'PercentAttackSpeedMod': 'as',
-        'FlatCritChanceMod': 'crit'
-    };
-
-    for (const [itemId, itemData] of Object.entries(rawItems)) {
-        const goldData = itemData.gold || {};
-        const goldTotal = goldData.total || 0;
-
-        // Skip non-purchasable items
-        if (!goldData.purchasable) continue;
-
-        // Determine category
-        let category;
-        if (goldTotal >= 2500) {
-            category = 'legendary';
-        } else if (goldTotal >= 1000) {
-            category = 'epic';
-        } else {
-            category = 'basic';
-        }
-
-        // Detect stat types
-        const itemStats = itemData.stats || {};
-        const statTypes = [];
-        for (const [ddragonKey, filterValue] of Object.entries(statMapping)) {
-            if (itemStats[ddragonKey] && itemStats[ddragonKey] !== 0) {
-                if (!statTypes.includes(filterValue)) {
-                    statTypes.push(filterValue);
-                }
-            }
-        }
-
-        const primaryStat = statTypes[0] || null;
-
-        // Get efficiency
-        let efficiency = itemData.gold_efficiency;
-        if (efficiency === 0) {
-            efficiency = null;
-        }
-
-        formattedItems.push({
-            id: itemId,
-            name: itemData.name || 'Unknown',
-            description: itemData.plaintext || '',
-            gold: goldTotal,
-            image: itemData.image_url || getItemImageUrl(parseInt(itemId), version),
-            category: category,
-            stats: itemData.plaintext || '',
-            stat_type: primaryStat,
-            stat_types: statTypes,
-            efficiency: efficiency,
-            raw_stats: itemStats,
-            tags: itemData.tags || []
-        });
+    // Get efficiency
+    let efficiency = itemData.gold_efficiency;
+    if (efficiency === 0) {
+      efficiency = null;
     }
 
-    return formattedItems;
+    formattedItems.push({
+      id: itemId,
+      name: itemData.name || "Unknown",
+      description: itemData.plaintext || "",
+      gold: goldTotal,
+      image: itemData.image_url || getItemImageUrl(parseInt(itemId), version),
+      category: category,
+      stats: itemData.plaintext || "",
+      stat_type: primaryStat,
+      stat_types: statTypes,
+      efficiency: efficiency,
+      raw_stats: itemStats,
+      tags: itemData.tags || [],
+    });
+  }
+
+  return formattedItems;
 }
 
 // =============================================================================
@@ -852,16 +883,16 @@ function formatItemsResponse(data) {
  * @returns {Promise<boolean>} True if healthy
  */
 export async function checkHealth() {
-    try {
-        const response = await fetch('https://api.hommet.ch/health', {
-            method: 'GET',
-            timeout: { secs: 5, nanos: 0 }
-        });
-        return response.ok;
-    } catch (error) {
-        console.error('[API] Health check failed:', error);
-        return false;
-    }
+  try {
+    const response = await fetch("https://api.hommet.ch/health", {
+      method: "GET",
+      timeout: { secs: 5, nanos: 0 },
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("[API] Health check failed:", error);
+    return false;
+  }
 }
 
 /**
@@ -870,30 +901,31 @@ export async function checkHealth() {
  * @returns {Promise<boolean>} True if connected
  */
 export async function verifyBackendConnection() {
-    let retries = 3;
+  let retries = 3;
 
-    while (retries > 0) {
-        const isHealthy = await checkHealth();
-        if (isHealthy) {
-            console.log('[API] Backend connected successfully');
-            return true;
-        }
-
-        console.warn(`[API] Backend not responding, retrying... (${retries} attempts left)`);
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        retries--;
+  while (retries > 0) {
+    const isHealthy = await checkHealth();
+    if (isHealthy) {
+      console.log("[API] Backend connected successfully");
+      return true;
     }
 
-    console.error('[API] Failed to connect to backend API');
-    return false;
+    console.warn(
+      `[API] Backend not responding, retrying... (${retries} attempts left)`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    retries--;
+  }
+
+  console.error("[API] Failed to connect to backend API");
+  return false;
 }
 
 // =============================================================================
 // IMAGE URL GENERATORS
 // =============================================================================
 
-const DDRAGON_PERK_BASE = 'https://ddragon.leagueoflegends.com/cdn/img/';
-
+const DDRAGON_PERK_BASE = "https://ddragon.leagueoflegends.com/cdn/img/";
 
 // Rune paths mapping
 const RUNE_PATHS = {
@@ -1077,33 +1109,48 @@ const RUNE_NAMES = {
 
 // Spell names and files
 const SPELL_NAMES = {
-    1: 'Cleanse', 3: 'Exhaust', 4: 'Flash', 6: 'Ghost', 7: 'Heal',
-    11: 'Smite', 12: 'Teleport', 13: 'Clarity', 14: 'Ignite',
-    21: 'Barrier', 32: 'Mark'
+  1: "Cleanse",
+  3: "Exhaust",
+  4: "Flash",
+  6: "Ghost",
+  7: "Heal",
+  11: "Smite",
+  12: "Teleport",
+  13: "Clarity",
+  14: "Ignite",
+  21: "Barrier",
+  32: "Mark",
 };
 
 const SPELL_FILES = {
-    1: 'SummonerBoost', 3: 'SummonerExhaust', 4: 'SummonerFlash',
-    6: 'SummonerHaste', 7: 'SummonerHeal', 11: 'SummonerSmite',
-    12: 'SummonerTeleport', 13: 'SummonerMana', 14: 'SummonerDot',
-    21: 'SummonerBarrier', 32: 'SummonerSnowball'
+  1: "SummonerBoost",
+  3: "SummonerExhaust",
+  4: "SummonerFlash",
+  6: "SummonerHaste",
+  7: "SummonerHeal",
+  11: "SummonerSmite",
+  12: "SummonerTeleport",
+  13: "SummonerMana",
+  14: "SummonerDot",
+  21: "SummonerBarrier",
+  32: "SummonerSnowball",
 };
 
 /**
  * Get rune image URL.
  */
 function getRuneImageUrl(runeId) {
-    runeId = parseInt(runeId);
-    if (RUNE_PATHS[runeId]) {
-        const path = RUNE_PATHS[runeId];
-        // Si c'est déjà une URL complète, la retourner directement
-        if (path.startsWith('http')) {
-            return path;
-        }
-        return `${DDRAGON_PERK_BASE}${path}`;
+  runeId = parseInt(runeId);
+  if (RUNE_PATHS[runeId]) {
+    const path = RUNE_PATHS[runeId];
+    // Si c'est déjà une URL complète, la retourner directement
+    if (path.startsWith("http")) {
+      return path;
     }
-    // Fallback
-    return `${DDRAGON_PERK_BASE}perk-images/Styles/Precision/Conqueror/Conqueror.png`;
+    return `${DDRAGON_PERK_BASE}${path}`;
+  }
+  // Fallback
+  return `${DDRAGON_PERK_BASE}perk-images/Styles/Precision/Conqueror/Conqueror.png`;
 }
 
 /**
@@ -1111,57 +1158,58 @@ function getRuneImageUrl(runeId) {
  * Format: https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/statmods/{id}.png
  */
 function getStatShardImageUrl(shardId) {
-    const CDRAGON_STATMODS_BASE = 'https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/statmods/';
-    const id = parseInt(shardId);
+  const CDRAGON_STATMODS_BASE =
+    "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/statmods/";
+  const id = parseInt(shardId);
 
-    // Stat shard IDs mapping to file names (CommunityDragon uses different naming)
-    const SHARD_FILES = {
-        5005: 'statmodsattackspeedicon',
-        5008: 'statmodsadaptiveforceicon',
-        5007: 'statmodscdrscalingicon',
-        5002: 'statmodsarmoricon',
-        5003: 'statmodsmagicresicon',
-        5001: 'statmodshealthscalingicon',
-        5010: 'statmodsmovementspeedicon',
-        5011: 'statmodshealthplusicon'
-    };
+  // Stat shard IDs mapping to file names (CommunityDragon uses different naming)
+  const SHARD_FILES = {
+    5005: "statmodsattackspeedicon",
+    5008: "statmodsadaptiveforceicon",
+    5007: "statmodscdrscalingicon",
+    5002: "statmodsarmoricon",
+    5003: "statmodsmagicresicon",
+    5001: "statmodshealthscalingicon",
+    5010: "statmodsmovementspeedicon",
+    5011: "statmodshealthplusicon",
+  };
 
-    const fileName = SHARD_FILES[id];
-    if (fileName) {
-        return `${CDRAGON_STATMODS_BASE}${fileName}.png`;
-    }
+  const fileName = SHARD_FILES[id];
+  if (fileName) {
+    return `${CDRAGON_STATMODS_BASE}${fileName}.png`;
+  }
 
-    // Fallback - try direct ID
-    return `${CDRAGON_STATMODS_BASE}${id}.png`;
+  // Fallback - try direct ID
+  return `${CDRAGON_STATMODS_BASE}${id}.png`;
 }
 
 /**
  * Get rune display name.
  */
 function getRuneName(runeId) {
-    return RUNE_NAMES[parseInt(runeId)] || `Rune ${runeId}`;
+  return RUNE_NAMES[parseInt(runeId)] || `Rune ${runeId}`;
 }
 
 /**
  * Get item image URL.
  */
 function getItemImageUrl(itemId, version) {
-    return `${DDRAGON_BASE_URL}/cdn/${version}/img/item/${itemId}.png`;
+  return `${DDRAGON_BASE_URL}/cdn/${version}/img/item/${itemId}.png`;
 }
 
 /**
  * Get summoner spell image URL.
  */
 function getSpellImageUrl(spellId, version) {
-    const spellName = SPELL_FILES[parseInt(spellId)] || `Summoner${spellId}`;
-    return `${DDRAGON_BASE_URL}/cdn/${version}/img/spell/${spellName}.png`;
+  const spellName = SPELL_FILES[parseInt(spellId)] || `Summoner${spellId}`;
+  return `${DDRAGON_BASE_URL}/cdn/${version}/img/spell/${spellName}.png`;
 }
 
 /**
  * Get summoner spell display name.
  */
 function getSpellName(spellId) {
-    return SPELL_NAMES[parseInt(spellId)] || `Spell ${spellId}`;
+  return SPELL_NAMES[parseInt(spellId)] || `Spell ${spellId}`;
 }
 
 // =============================================================================
@@ -1172,5 +1220,5 @@ function getSpellName(spellId) {
  * Get application version.
  */
 export function getAppVersion() {
-    return '1.0.0';
+  return "1.2.2";
 }
