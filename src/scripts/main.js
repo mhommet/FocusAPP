@@ -72,6 +72,9 @@ let currentBuild = null;
 /** @type {boolean} Whether backend is connected */
 let backendConnected = false;
 
+/** @type {number} Build request ID counter - used to ignore stale responses */
+let buildRequestId = 0;
+
 // =============================================================================
 // INITIALIZATION
 // =============================================================================
@@ -364,8 +367,8 @@ function updateTable(champions) {
             <td><strong>${champ.name}</strong></td>
             <td>${roleDisplay}</td>
             <td class="${getTierClass(champ.tier)}">${champ.tier}</td>
-            <td>${champ.winrate}</td>
-            <td>${champ.pickrate || '-'}</td>
+            <td>${formatWinrate(champ.winrate)}</td>
+            <td>${formatPickrate(champ.pickrate)}</td>
             <td>${champ.games ? champ.games.toLocaleString() : '-'}</td>
         </tr>
     `;
@@ -381,6 +384,40 @@ function getTierClass(tier) {
     if (tier === 'C') return 'tier-c';
     if (tier === 'D') return 'tier-d';
     return '';
+}
+
+/**
+ * Format winrate for display.
+ * Backend sends decimal (0.833 = 83.3%)
+ * @param {number|string} winrate - Winrate value
+ * @returns {string} Formatted winrate with %
+ */
+function formatWinrate(winrate) {
+    if (winrate === null || winrate === undefined || winrate === '-') return '-';
+    const value = typeof winrate === 'string' ? parseFloat(winrate.replace('%', '')) : winrate;
+    // If already in percentage format (>1), just format it
+    if (value > 1) {
+        return value.toFixed(1) + '%';
+    }
+    // If decimal format (0.833 = 83.3%), multiply by 100
+    return (value * 100).toFixed(1) + '%';
+}
+
+/**
+ * Format pickrate for display.
+ * Backend sends decimal (0.05 = 5%)
+ * @param {number|string} pickrate - Pickrate value
+ * @returns {string} Formatted pickrate with %
+ */
+function formatPickrate(pickrate) {
+    if (pickrate === null || pickrate === undefined || pickrate === '-') return '-';
+    const value = typeof pickrate === 'string' ? parseFloat(pickrate.replace('%', '')) : pickrate;
+    // If already in percentage format (>1), just format it
+    if (value > 1) {
+        return value.toFixed(1) + '%';
+    }
+    // If decimal format (0.05 = 5%), multiply by 100
+    return (value * 100).toFixed(1) + '%';
 }
 
 /**
@@ -732,6 +769,7 @@ async function loadChampionList() {
 /**
  * Load and display champion build from the API.
  * Uses Diamond+ aggregated data for optimal statistics.
+ * Uses request ID to ignore stale responses when user changes selection quickly.
  * @returns {Promise<void>}
  */
 async function loadChampionBuild() {
@@ -748,8 +786,14 @@ async function loadChampionBuild() {
             </div>
         `;
         if (cacheInfo) cacheInfo.innerHTML = '';
+        const qualityIndicator = document.getElementById('build-quality-indicator');
+        if (qualityIndicator) qualityIndicator.innerHTML = '';
         return;
     }
+
+    // Increment request ID to track this specific request
+    const thisRequestId = ++buildRequestId;
+    console.log(`[Build] Request #${thisRequestId}: ${championName} ${lane}`);
 
     // Show loading spinner with champion name
     container.innerHTML = `
@@ -770,10 +814,18 @@ async function loadChampionBuild() {
     // Fetch build from API
     const build = await getChampionBuild(championName, lane);
 
+    // Check if this request is still the latest one
+    if (thisRequestId !== buildRequestId) {
+        console.log(`[Build] Request #${thisRequestId} ignored (stale - current is #${buildRequestId})`);
+        return; // Ignore stale response
+    }
+
     if (build && build.success) {
         currentBuild = build;
         renderBuild(build);
         updateCacheIndicator(build);
+        updateQualityIndicator(build);
+        console.log(`[Build] Request #${thisRequestId} completed: ${championName} ${lane}`);
     } else {
         const errorMsg = build?.error || 'Unknown error';
         container.innerHTML = `
@@ -787,6 +839,8 @@ async function loadChampionBuild() {
             </div>
         `;
         if (cacheInfo) cacheInfo.innerHTML = '';
+        const qualityIndicator = document.getElementById('build-quality-indicator');
+        if (qualityIndicator) qualityIndicator.innerHTML = '';
     }
 }
 
@@ -804,6 +858,10 @@ async function forceRefreshBuild() {
     if (!championName) {
         return;
     }
+
+    // Increment request ID to track this specific request
+    const thisRequestId = ++buildRequestId;
+    console.log(`[Build] Force refresh #${thisRequestId}: ${championName} ${lane}`);
 
     // Disable refresh button during loading
     if (refreshBtn) {
@@ -836,12 +894,20 @@ async function forceRefreshBuild() {
         refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
     }
 
+    // Check if this request is still the latest one
+    if (thisRequestId !== buildRequestId) {
+        console.log(`[Build] Force refresh #${thisRequestId} ignored (stale)`);
+        return;
+    }
+
     if (build && build.success) {
         currentBuild = build;
         renderBuild(build);
         updateCacheIndicator(build);
+        updateQualityIndicator(build);
         // Show success feedback
         showToast('Data refreshed successfully!', 'success');
+        console.log(`[Build] Force refresh #${thisRequestId} completed`);
     } else {
         const errorMsg = build?.error || 'Unknown error';
         container.innerHTML = `
@@ -855,7 +921,47 @@ async function forceRefreshBuild() {
             </div>
         `;
         if (cacheInfo) cacheInfo.innerHTML = '';
+        const qualityIndicator = document.getElementById('build-quality-indicator');
+        if (qualityIndicator) qualityIndicator.innerHTML = '';
     }
+}
+
+/**
+ * Update data quality indicator based on games count.
+ * High: >100 games, Medium: 10-100 games, Low: <10 games
+ */
+function updateQualityIndicator(build) {
+    const indicator = document.getElementById('build-quality-indicator');
+    if (!indicator) return;
+
+    const gamesCount = build.games || 0;
+
+    if (gamesCount === 0) {
+        indicator.innerHTML = '';
+        indicator.className = 'quality-indicator';
+        return;
+    }
+
+    let qualityClass, icon, text;
+
+    if (gamesCount >= 100) {
+        qualityClass = 'quality-high';
+        icon = 'fa-check-circle';
+        text = 'High quality';
+    } else if (gamesCount >= 10) {
+        qualityClass = 'quality-medium';
+        icon = 'fa-info-circle';
+        text = 'Medium quality';
+    } else {
+        qualityClass = 'quality-low';
+        icon = 'fa-exclamation-triangle';
+        text = 'Low data';
+    }
+
+    const gamesStr = gamesCount >= 1000 ? `${(gamesCount / 1000).toFixed(1)}k` : gamesCount.toString();
+    indicator.innerHTML = `<i class="fas ${icon}"></i> ${text} (${gamesStr} games)`;
+    indicator.className = `quality-indicator ${qualityClass}`;
+    indicator.title = `Build statistics based on ${gamesCount} games from Diamond+ ranks`;
 }
 
 /**
@@ -909,6 +1015,36 @@ function showToast(message, type = 'info') {
 }
 
 /**
+ * Deduplicate items by ID.
+ * Removes duplicate items from an array, keeping only the first occurrence.
+ * @param {Array} items - Array of items (may contain duplicates)
+ * @returns {Array} Array of unique items
+ */
+function deduplicateItems(items) {
+    if (!items || !Array.isArray(items)) {
+        return [];
+    }
+
+    const seen = new Set();
+    const uniqueItems = [];
+
+    for (const item of items) {
+        if (!item) continue;
+
+        const itemId = item.id || item;
+        if (seen.has(itemId)) {
+            console.log(`[Build] Duplicate item removed: ${item.name || itemId}`);
+            continue;
+        }
+
+        seen.add(itemId);
+        uniqueItems.push(item);
+    }
+
+    return uniqueItems;
+}
+
+/**
  * Render the champion build in the UI.
  * @param {Object} build - Build data from API
  * @returns {void}
@@ -921,7 +1057,9 @@ function renderBuild(build) {
     // Winrate badge with color coding (green >52%, red <48%)
     let winrateBadge = '';
     if (build.winrate !== null && build.winrate !== undefined) {
-        const wr = parseFloat(build.winrate);
+        let wr = parseFloat(build.winrate);
+        // Backend sends decimal (0.833 = 83.3%), convert to percentage if needed
+        if (wr <= 1) wr = wr * 100;
         let wrClass = 'winrate-medium';
         if (wr >= 52) wrClass = 'winrate-high';
         else if (wr < 48) wrClass = 'winrate-low';
@@ -936,19 +1074,7 @@ function renderBuild(build) {
         gamesBadge = `<span class="stat-badge games-badge"><i class="fas fa-gamepad"></i> Based on ${gamesStr} games</span>`;
     }
 
-    // Low data warning (< 10 games)
-    let lowDataWarning = '';
-    if (gamesCount > 0 && gamesCount < 10) {
-        lowDataWarning = `
-            <div class="low-data-warning">
-                <i class="fas fa-exclamation-triangle"></i>
-                <span>Build based on limited data (${gamesCount} games). Statistics may be unreliable.</span>
-                <button class="warning-refresh-btn" onclick="forceRefreshBuild()">
-                    <i class="fas fa-sync-alt"></i> Refresh
-                </button>
-            </div>
-        `;
-    }
+    // Low data warning removed - now using quality indicator in controls bar
 
     // === RUNES SECTION ===
     let runesHtml = '';
@@ -975,24 +1101,20 @@ function renderBuild(build) {
         )
         .join("");
 
-      // Stat Shards (3 shards) - with winrate tooltip
+      // Stat Shards (3 shards) - vertical, small, no border - below secondary runes
       const statShards = build.stat_shards || build.runes?.shards || [];
       const shardsHtml = statShards
         .map((s) => {
           const winrateText = s.winrate
             ? ` - ${(s.winrate * 100).toFixed(1)}% WR`
             : "";
-          const rowLabel = s.row
-            ? s.row.charAt(0).toUpperCase() + s.row.slice(1)
-            : "";
-          // Générer l'URL de l'icône si elle n'est pas fournie
+          // Generate icon URL if not provided
           const iconUrl =
             s.icon ||
             `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/statmods/${s.id}.png`;
 
-          return `<div class="stat-shard-item" title="${s.name}${winrateText}">
-            <img src="${iconUrl}" alt="${s.name}" class="rune-shard" onerror="this.style.opacity='0.5'">
-            <span class="shard-row-label">${rowLabel}</span>
+          return `<div class="stat-shard-mini" title="${s.name}${winrateText}">
+            <img src="${iconUrl}" alt="${s.name}" onerror="this.style.opacity='0.5'">
         </div>`;
         })
         .join("");
@@ -1016,20 +1138,14 @@ function renderBuild(build) {
                     <span class="rune-tree-name">SECONDARY</span>
                 </div>
                 <div class="runes-list secondary-runes">${secondaryRunesHtml}</div>
+                ${shardsHtml ? `
+                <!-- STAT SHARDS: below secondary, vertical, small, no border -->
+                <div class="stat-shards-vertical-container">
+                    ${shardsHtml}
+                </div>
+                ` : ""}
             </div>
         </div>
-        ${
-          shardsHtml
-            ? `
-        <div class="stat-shards-section">
-            <div class="shards-header">
-                <span class="shards-label">STAT SHARDS</span>
-            </div>
-            <div class="stat-shards-grid">${shardsHtml}</div>
-        </div>
-        `
-            : ""
-        }
     </div>
 `;
     }
@@ -1057,10 +1173,11 @@ function renderBuild(build) {
     // === ITEMS ===
     let itemsHtml = '';
     if (build.items) {
-        // Starting items
+        // Starting items (deduplicated)
         let startingHtml = '';
-        if (build.items.starting && build.items.starting.length > 0) {
-            const startItems = build.items.starting
+        const uniqueStartingItems = deduplicateItems(build.items.starting || []);
+        if (uniqueStartingItems.length > 0) {
+            const startItems = uniqueStartingItems
                 .map(
                     (i) =>
                         `<img src="${i.icon}" alt="${i.name || 'Starting Item'}" title="${i.name || 'Starting Item'}" class="build-item small" onerror="this.style.display='none'">`
@@ -1091,11 +1208,12 @@ function renderBuild(build) {
             }
         }
 
-        // Core items (WITHOUT boots and without duplicates from full_build)
+        // Core items (deduplicated, WITHOUT boots)
         let coreHtml = '';
-        if (build.items.core && build.items.core.length > 0) {
+        const uniqueCoreItems = deduplicateItems(build.items.core || []);
+        if (uniqueCoreItems.length > 0) {
             const bootsId = build.items.boots ? build.items.boots.id || build.items.boots : null;
-            const coreItems = build.items.core
+            const coreItems = uniqueCoreItems
                 .filter((item) => {
                     const itemId = item.id || item;
                     return itemId !== bootsId;
@@ -1180,7 +1298,6 @@ function renderBuild(build) {
 
     // === RENDER ===
     container.innerHTML = `
-        ${lowDataWarning}
         <div class="build-header">
             <div class="build-champion-info">
                 <h2>${build.champion}</h2>
@@ -1234,4 +1351,15 @@ window.retryBackendConnection = retryBackendConnection;
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     init();
+
+    // Fix: Prevent auto-select on search inputs focus (WebView behavior)
+    document.querySelectorAll('.search-input-inline, #search-input').forEach(input => {
+        input.addEventListener('focus', (e) => {
+            // Delay to override any auto-select behavior
+            setTimeout(() => {
+                const len = e.target.value.length;
+                e.target.setSelectionRange(len, len);
+            }, 0);
+        });
+    });
 });

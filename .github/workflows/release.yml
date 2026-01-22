@@ -1,0 +1,79 @@
+name: 'Release - Build & Publish'
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    permissions:
+      contents: write
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build Tauri application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'FocusApp ${{ github.ref_name }}'
+          releaseBody: |
+            ## FocusApp ${{ github.ref_name }} - Diamond+ League Companion
+
+            ### Installation
+
+            **Download:** `FocusApp_${{ github.ref_name }}_x64-setup.exe`
+
+            1. Download the installer above
+            2. Run the .exe file
+            3. Follow installation wizard
+            4. Launch from Desktop shortcut
+
+            ### Windows SmartScreen Warning
+
+            Windows may show a security warning. Click **"More info"** then **"Run anyway"**
+
+            ### What's New
+
+            - Diamond+ tier lists with win/pick/ban rates
+            - Optimized builds (runes, items, skills)
+            - Items database with gold efficiency
+            - Catppuccin Mocha dark theme
+
+            ---
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/....${{ github.ref_name }}
+          releaseDraft: false
+          prerelease: false
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FocusApp-${{ github.ref_name }}-installer
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          retention-days: 90

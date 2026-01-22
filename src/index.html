@@ -147,6 +147,11 @@
                 <div class="control-group">
                     <span id="build-cache-info" class="cache-info-badge"></span>
                 </div>
+
+                <!-- Data Quality Indicator -->
+                <div class="control-group">
+                    <span id="build-quality-indicator" class="quality-indicator"></span>
+                </div>
             </div>
 
             <main>
@@ -161,23 +166,22 @@
 
         <!-- ITEMS TAB -->
         <div id="items-tab" class="tab-content">
-            <div class="controls-bar">
-                <div class="control-group">
-                    <label for="item-category"><i class="fas fa-layer-group"></i> Categorie</label>
-                    <select id="item-category" onchange="filterItems()">
-                        <option value="all">Tous les Items</option>
-                        <option value="legendary">Legendaires</option>
-                        <option value="epic">Epiques</option>
-                        <option value="basic">Basiques</option>
-                    </select>
+            <!-- FILTRES SUR UNE SEULE LIGNE -->
+            <div class="controls-bar items-controls-bar">
+
+                <!-- Recherche par nom -->
+                <div class="search-group-inline">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="item-search" placeholder="Search items..." class="search-input-inline" onkeyup="filterItems()">
                 </div>
 
                 <div class="control-separator"></div>
 
-                <div class="control-group">
-                    <label for="item-stat"><i class="fas fa-chart-bar"></i> Stat</label>
-                    <select id="item-stat" onchange="filterItems()">
-                        <option value="all">Toutes les Stats</option>
+                <!-- Filtre par stat -->
+                <div class="filter-group-inline">
+                    <label for="item-stat"><i class="fas fa-filter"></i> Stat:</label>
+                    <select id="item-stat" class="filter-select-inline" onchange="filterItems()">
+                        <option value="all">All Stats</option>
                         <option value="ad">Attack Damage</option>
                         <option value="ap">Ability Power</option>
                         <option value="health">Health</option>
@@ -190,37 +194,48 @@
 
                 <div class="control-separator"></div>
 
-                <div class="control-group">
-                    <label for="item-price"><i class="fas fa-coins"></i> Prix</label>
-                    <select id="item-price" onchange="filterItems()">
-                        <option value="all">Tous les Prix</option>
-                        <option value="0-1000">< 1000g (Early)</option>
-                        <option value="1000-2000">1000-2000g (Mid)</option>
-                        <option value="2000-3000">2000-3000g (Late)</option>
-                        <option value="3000+">3000g+ (Full)</option>
-                    </select>
-                </div>
-
-                <div class="control-group">
-                    <label for="item-efficiency"><i class="fas fa-percent"></i> Efficacite</label>
-                    <select id="item-efficiency" onchange="filterItems()">
-                        <option value="all">Toutes</option>
-                        <option value="high">>=100% (Gold Efficient)</option>
-                        <option value="medium">90-99%</option>
-                        <option value="low"><90%</option>
+                <!-- Filtre par categorie -->
+                <div class="filter-group-inline">
+                    <label for="item-category"><i class="fas fa-layer-group"></i> Type:</label>
+                    <select id="item-category" class="filter-select-inline" onchange="filterItems()">
+                        <option value="all">All</option>
+                        <option value="legendary">Legendary</option>
+                        <option value="epic">Epic</option>
+                        <option value="basic">Basic</option>
                     </select>
                 </div>
 
                 <div class="control-separator"></div>
 
-                <div class="control-group search-group">
-                    <label for="item-search"><i class="fas fa-search"></i> Recherche</label>
-                    <input type="text" id="item-search" placeholder="Chercher un item..." onkeyup="filterItems()">
+                <!-- Filtre par prix -->
+                <div class="filter-group-inline">
+                    <label for="item-price"><i class="fas fa-coins"></i> Price:</label>
+                    <select id="item-price" class="filter-select-inline" onchange="filterItems()">
+                        <option value="all">All</option>
+                        <option value="0-1000">&lt; 1000g</option>
+                        <option value="1000-2000">1-2k</option>
+                        <option value="2000-3000">2-3k</option>
+                        <option value="3000+">3k+</option>
+                    </select>
                 </div>
 
-                <div class="control-group">
-                    <span id="items-patch-version" class="version-badge">Patch ...</span>
+                <div class="control-separator"></div>
+
+                <!-- Filtre par efficacite -->
+                <div class="filter-group-inline">
+                    <label for="item-efficiency"><i class="fas fa-percent"></i> Eff:</label>
+                    <select id="item-efficiency" class="filter-select-inline" onchange="filterItems()">
+                        <option value="all">All</option>
+                        <option value="high">&ge;100%</option>
+                        <option value="medium">90-99%</option>
+                        <option value="low">&lt;90%</option>
+                    </select>
                 </div>
+
+                <div class="control-separator"></div>
+
+                <!-- Patch version -->
+                <span id="items-patch-version" class="version-badge">Patch ...</span>
             </div>
 
             <main>
