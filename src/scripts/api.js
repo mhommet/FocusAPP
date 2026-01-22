@@ -312,250 +312,283 @@ export async function getChampionBuild(championName, role = 'default', forceRefr
  * @returns {Object} Formatted build data
  */
 function formatBuildResponse(data, champion, role) {
-    const buildData = data.build || {};
-    const version = cachedDDragonVersion;
+  const buildData = data.build || {};
+  const version = cachedDDragonVersion;
 
-    // === RUNES ===
-    const runesArray = buildData.runes || [];
+  // === RUNES ===
+  const runesArray = buildData.runes || [];
 
-    // Find primary tree (has keystones)
-    const primaryTree = runesArray.find(t => t.keystones && t.keystones.length > 0);
-    // Find secondary tree (has runes but no keystones, different path from primary)
-    const secondaryTree = runesArray.find(t =>
-        t.runes && t.runes.length > 0 &&
-        (!t.keystones || t.keystones.length === 0) &&
-        t.path !== primaryTree?.path
+  // Find primary tree (has keystones)
+  const primaryTree = runesArray.find(
+    (t) => t.keystones && t.keystones.length > 0,
+  );
+  // Find secondary tree (has runes but no keystones, different path from primary)
+  const secondaryTree = runesArray.find(
+    (t) =>
+      t.runes &&
+      t.runes.length > 0 &&
+      (!t.keystones || t.keystones.length === 0) &&
+      t.path !== primaryTree?.path,
+  );
+
+  // Get keystone (highest count from primary tree)
+  let keystoneId = null;
+  let keystoneName = "Keystone";
+  if (primaryTree && primaryTree.keystones) {
+    const bestKeystone = primaryTree.keystones.reduce(
+      (best, curr) => (curr.count > (best?.count || 0) ? curr : best),
+      null,
     );
-
-    // Get keystone (highest count from primary tree)
-    let keystoneId = null;
-    let keystoneName = 'Keystone';
-    if (primaryTree && primaryTree.keystones) {
-        const bestKeystone = primaryTree.keystones.reduce((best, curr) =>
-            (curr.count > (best?.count || 0)) ? curr : best, null);
-        if (bestKeystone) {
-            keystoneId = bestKeystone.id;
-            keystoneName = getRuneName(bestKeystone.id);
-        }
+    if (bestKeystone) {
+      keystoneId = bestKeystone.id;
+      keystoneName = getRuneName(bestKeystone.id);
     }
-    const keystoneIcon = keystoneId ? getRuneImageUrl(keystoneId) : null;
+  }
+  const keystoneIcon = keystoneId ? getRuneImageUrl(keystoneId) : null;
 
-    // Primary tree runes (from primary tree's runes array if exists, pick top 3 by count)
-    // These are the minor runes from the primary tree (rows 2-4)
-    const primaryRunes = [];
-    if (primaryTree && primaryTree.runes && primaryTree.runes.length > 0) {
-        const sortedPrimary = [...primaryTree.runes].sort((a, b) => b.count - a.count).slice(0, 3);
-        for (const rune of sortedPrimary) {
-            primaryRunes.push({
-                id: rune.id,
-                name: getRuneName(rune.id),
-                icon: getRuneImageUrl(rune.id)
-            });
-        }
+  // Primary tree runes (from primary tree's runes array if exists, pick top 3 by count)
+  // These are the minor runes from the primary tree (rows 2-4)
+  const primaryRunes = [];
+  if (primaryTree && primaryTree.runes.length >= 3) {
+    // Ordre visuel = ordre API : row1 (idx1), row2 (idx2), row3 (idx3)
+    // Pas de tri par count ! Garde l'ordre backend (le plus populaire par row)
+    const apiOrderRunes = primaryTree.runes.slice(0, 3); // Déjà top3 par row du backend
+    for (const rune of apiOrderRunes) {
+      primaryRunes.push({
+        id: rune.id,
+        name: getRuneName(rune.id),
+        icon: getRuneImageUrl(rune.id),
+        count: rune.count,
+        winrate: rune.winrate,
+      });
     }
+  }
 
-    // Secondary tree runes (pick top 2 by count)
-    const secondaryRunes = [];
-    if (secondaryTree && secondaryTree.runes) {
-        const sortedSecondary = [...secondaryTree.runes].sort((a, b) => b.count - a.count).slice(0, 2);
-        for (const rune of sortedSecondary) {
-            secondaryRunes.push({
-                id: rune.id,
-                name: getRuneName(rune.id),
-                icon: getRuneImageUrl(rune.id)
-            });
-        }
+  // Secondary tree runes (pick top 2 by count)
+  const secondaryRunes = [];
+  if (secondaryTree && secondaryTree.runes) {
+    const sortedSecondary = [...secondaryTree.runes]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 2);
+    for (const rune of sortedSecondary) {
+      secondaryRunes.push({
+        id: rune.id,
+        name: getRuneName(rune.id),
+        icon: getRuneImageUrl(rune.id),
+      });
     }
+  }
 
-    // Shards - handle both old format (buildData.shards) and new format (buildData.stat_shards)
-    const shards = [];
+  // Shards - handle both old format (buildData.shards) and new format (buildData.stat_shards)
+  const shards = [];
 
-    // New API format: stat_shards array with {id, name, row, count, winrate}
-    const statShardsArray = buildData.stat_shards || [];
-    if (statShardsArray.length > 0) {
-        // Process new format - order by row: offense, flex, defense
-        for (const row of ['offense', 'flex', 'defense']) {
-            const shard = statShardsArray.find(s => s.row === row);
-            if (shard) {
-                shards.push({
-                    id: shard.id,
-                    name: shard.name || getRuneName(shard.id),
-                    icon: getStatShardImageUrl(shard.id),
-                    row: shard.row,
-                    winrate: shard.winrate
-                });
-            }
-        }
-    } else {
-        // Fallback to old format: shards object with {offense: id, flex: id, defense: id}
-        const shardsData = buildData.shards || {};
-        for (const shardKey of ['offense', 'flex', 'defense']) {
-            const shardId = shardsData[shardKey];
-            if (shardId) {
-                shards.push({
-                    id: shardId,
-                    name: getRuneName(shardId),
-                    icon: getStatShardImageUrl(shardId),
-                    row: shardKey
-                });
-            }
-        }
-    }
-
-    // === ITEMS ===
-    // API format: build.items = [{ slot: "first", items: [{ id, name, count, winrate }] }, ...]
-    const itemsArray = buildData.items || [];
-
-    // Common item IDs
-    const starterIds = [1055, 1054, 1056, 1082, 1083, 2003, 2031, 3850, 3854, 3858, 3862, 1036, 1037];
-    const bootIds = [1001, 3006, 3009, 3020, 3047, 3111, 3117, 3158];
-
-    // Helper to get best item from a slot
-    const getBestItemFromSlot = (slotName) => {
-        const slot = itemsArray.find(s => s.slot === slotName);
-        if (slot && slot.items && slot.items.length > 0) {
-            // Get item with highest count
-            return slot.items.reduce((best, curr) =>
-                (curr.count > (best?.count || 0)) ? curr : best, null);
-        }
-        return null;
-    };
-
-    // Helper to format item
-    const formatItem = (item) => {
-        if (!item) return null;
-        return {
-            id: item.id,
-            name: item.name || `Item ${item.id}`,
-            icon: getItemImageUrl(item.id, version)
-        };
-    };
-
-    // Starting items (use common starting items logic or first slot's cheaper items)
-    const startingItems = [];
-    const firstSlot = itemsArray.find(s => s.slot === 'first');
-    if (firstSlot && firstSlot.items) {
-        // Filter for likely starting items (typically < 500 gold or common starters like Doran's)
-        const starters = firstSlot.items.filter(i => starterIds.includes(i.id));
-        if (starters.length > 0) {
-            const bestStarter = starters.reduce((best, curr) =>
-                (curr.count > (best?.count || 0)) ? curr : best, null);
-            if (bestStarter) {
-                startingItems.push(formatItem(bestStarter));
-            }
-        }
-    }
-
-    // Core items (first 3 completed items from slots, excluding boots and starters)
-    const coreItems = [];
-
-    for (const slotName of ['first', 'second', 'third']) {
-        const bestItem = getBestItemFromSlot(slotName);
-        if (bestItem && !bootIds.includes(bestItem.id) && !starterIds.includes(bestItem.id)) {
-            coreItems.push(formatItem(bestItem));
-        }
-    }
-
-    // Boots (find boots from any slot)
-    let boots = null;
-    for (const slot of itemsArray) {
-        if (slot.items) {
-            const bootItem = slot.items.find(i => bootIds.includes(i.id));
-            if (bootItem && (!boots || bootItem.count > boots.count)) {
-                boots = formatItem(bootItem);
-            }
-        }
-    }
-
-    // Full build (items from slots 4-6)
-    const fullBuildItems = [];
-    for (const slotName of ['fourth', 'fifth', 'sixth']) {
-        const bestItem = getBestItemFromSlot(slotName);
-        if (bestItem && !bootIds.includes(bestItem.id)) {
-            fullBuildItems.push(formatItem(bestItem));
-        }
-    }
-
-    // Situational items (other popular items not in core)
-    const situationalItems = [];
-    const usedIds = new Set([
-        ...coreItems.map(i => i?.id),
-        ...fullBuildItems.map(i => i?.id),
-        boots?.id
-    ].filter(Boolean));
-
-    for (const slot of itemsArray) {
-        if (slot.items) {
-            for (const item of slot.items.slice(0, 3)) {
-                if (!usedIds.has(item.id) && !bootIds.includes(item.id) && !starterIds.includes(item.id)) {
-                    situationalItems.push(formatItem(item));
-                    usedIds.add(item.id);
-                    if (situationalItems.length >= 4) break;
-                }
-            }
-        }
-        if (situationalItems.length >= 4) break;
-    }
-
-    // === SKILLS ===
-    const skillOrderArray = buildData.skill_order || [];
-    // If skill_order is empty, leave it empty
-    const skillOrder = skillOrderArray.length > 0 ? skillOrderArray : [];
-
-    // === SUMMONER SPELLS ===
-    // API format: build.summoner_spells = [{ spell: "Flash", count: 18 }, ...]
-    const summonerSpellsArray = buildData.summoner_spells || [];
-    const summoners = [];
-
-    // Sort by count and take top 2
-    const sortedSpells = [...summonerSpellsArray].sort((a, b) => b.count - a.count).slice(0, 2);
-    for (const spell of sortedSpells) {
-        const spellId = getSpellIdFromName(spell.spell);
-        summoners.push({
-            id: spellId,
-            name: spell.spell,
-            icon: getSpellImageUrl(spellId, version)
+  // New API format: stat_shards array with {id, name, row, count, winrate}
+  const statShardsArray = buildData.stat_shards || [];
+  if (statShardsArray.length > 0) {
+    // Process new format - order by row: offense, flex, defense
+    for (const row of ["offense", "flex", "defense"]) {
+      const shard = statShardsArray.find((s) => s.row === row);
+      if (shard) {
+        shards.push({
+          id: shard.id,
+          name: shard.name || getRuneName(shard.id),
+          icon: getStatShardImageUrl(shard.id),
+          row: shard.row,
+          winrate: shard.winrate,
         });
+      }
     }
+  } else {
+    // Fallback to old format: shards object with {offense: id, flex: id, defense: id}
+    const shardsData = buildData.shards || {};
+    for (const shardKey of ["offense", "flex", "defense"]) {
+      const shardId = shardsData[shardKey];
+      if (shardId) {
+        shards.push({
+          id: shardId,
+          name: getRuneName(shardId),
+          icon: getStatShardImageUrl(shardId),
+          row: shardKey,
+        });
+      }
+    }
+  }
 
-    // === STATS ===
-    const winrate = data.weighted_winrate ? (data.weighted_winrate * 100) : null;
-    const games = data.total_games_analyzed || 0;
+  // === ITEMS ===
+  // API format: build.items = [{ slot: "first", items: [{ id, name, count, winrate }] }, ...]
+  const itemsArray = buildData.items || [];
 
-    // === CACHE INFO ===
-    const cached = data.cached || false;
-    const cacheAgeHours = data.cache_age_hours;
+  // Common item IDs
+  const starterIds = [
+    1055, 1054, 1056, 1082, 1083, 2003, 2031, 3850, 3854, 3858, 3862, 1036,
+    1037,
+  ];
+  const bootIds = [1001, 3006, 3009, 3020, 3047, 3111, 3117, 3158];
 
+  // Helper to get best item from a slot
+  const getBestItemFromSlot = (slotName) => {
+    const slot = itemsArray.find((s) => s.slot === slotName);
+    if (slot && slot.items && slot.items.length > 0) {
+      // Get item with highest count
+      return slot.items.reduce(
+        (best, curr) => (curr.count > (best?.count || 0) ? curr : best),
+        null,
+      );
+    }
+    return null;
+  };
+
+  // Helper to format item
+  const formatItem = (item) => {
+    if (!item) return null;
     return {
-        success: true,
-        error: null,
-        champion: (data.champion || champion).charAt(0).toUpperCase() + (data.champion || champion).slice(1),
-        champion_id: null,
-        role: data.role || role,
-        rank: data.rank || 'DIAMOND+',
-        source: 'api.hommet.ch',
-        runes: {
-            keystone: keystoneId,
-            keystone_icon: keystoneIcon,
-            keystone_name: keystoneName,
-            primary: primaryRunes,
-            secondary: secondaryRunes,
-            shards: shards
-        },
-        items: {
-            starting: startingItems.filter(Boolean),
-            core: coreItems.filter(Boolean),
-            boots: boots,
-            full_build: fullBuildItems.filter(Boolean),
-            situational: situationalItems.filter(Boolean)
-        },
-        skills: { order: skillOrder },
-        summoners: summoners,
-        winrate: winrate,
-        games: games,
-        cached: cached,
-        cache_age_hours: cacheAgeHours
+      id: item.id,
+      name: item.name || `Item ${item.id}`,
+      icon: getItemImageUrl(item.id, version),
     };
+  };
+
+  // Starting items (use common starting items logic or first slot's cheaper items)
+  const startingItems = [];
+  const firstSlot = itemsArray.find((s) => s.slot === "first");
+  if (firstSlot && firstSlot.items) {
+    // Filter for likely starting items (typically < 500 gold or common starters like Doran's)
+    const starters = firstSlot.items.filter((i) => starterIds.includes(i.id));
+    if (starters.length > 0) {
+      const bestStarter = starters.reduce(
+        (best, curr) => (curr.count > (best?.count || 0) ? curr : best),
+        null,
+      );
+      if (bestStarter) {
+        startingItems.push(formatItem(bestStarter));
+      }
+    }
+  }
+
+  // Core items (first 3 completed items from slots, excluding boots and starters)
+  const coreItems = [];
+
+  for (const slotName of ["first", "second", "third"]) {
+    const bestItem = getBestItemFromSlot(slotName);
+    if (
+      bestItem &&
+      !bootIds.includes(bestItem.id) &&
+      !starterIds.includes(bestItem.id)
+    ) {
+      coreItems.push(formatItem(bestItem));
+    }
+  }
+
+  // Boots (find boots from any slot)
+  let boots = null;
+  for (const slot of itemsArray) {
+    if (slot.items) {
+      const bootItem = slot.items.find((i) => bootIds.includes(i.id));
+      if (bootItem && (!boots || bootItem.count > boots.count)) {
+        boots = formatItem(bootItem);
+      }
+    }
+  }
+
+  // Full build (items from slots 4-6)
+  const fullBuildItems = [];
+  for (const slotName of ["fourth", "fifth", "sixth"]) {
+    const bestItem = getBestItemFromSlot(slotName);
+    if (bestItem && !bootIds.includes(bestItem.id)) {
+      fullBuildItems.push(formatItem(bestItem));
+    }
+  }
+
+  // Situational items (other popular items not in core)
+  const situationalItems = [];
+  const usedIds = new Set(
+    [
+      ...coreItems.map((i) => i?.id),
+      ...fullBuildItems.map((i) => i?.id),
+      boots?.id,
+    ].filter(Boolean),
+  );
+
+  for (const slot of itemsArray) {
+    if (slot.items) {
+      for (const item of slot.items.slice(0, 3)) {
+        if (
+          !usedIds.has(item.id) &&
+          !bootIds.includes(item.id) &&
+          !starterIds.includes(item.id)
+        ) {
+          situationalItems.push(formatItem(item));
+          usedIds.add(item.id);
+          if (situationalItems.length >= 4) break;
+        }
+      }
+    }
+    if (situationalItems.length >= 4) break;
+  }
+
+  // === SKILLS ===
+  const skillOrderArray = buildData.skill_order || [];
+  // If skill_order is empty, leave it empty
+  const skillOrder = skillOrderArray.length > 0 ? skillOrderArray : [];
+
+  // === SUMMONER SPELLS ===
+  // API format: build.summoner_spells = [{ spell: "Flash", count: 18 }, ...]
+  const summonerSpellsArray = buildData.summoner_spells || [];
+  const summoners = [];
+
+  // Sort by count and take top 2
+  const sortedSpells = [...summonerSpellsArray]
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 2);
+  for (const spell of sortedSpells) {
+    const spellId = getSpellIdFromName(spell.spell);
+    summoners.push({
+      id: spellId,
+      name: spell.spell,
+      icon: getSpellImageUrl(spellId, version),
+    });
+  }
+
+  // === STATS ===
+  const winrate = data.weighted_winrate ? data.weighted_winrate * 100 : null;
+  const games = data.total_games_analyzed || 0;
+
+  // === CACHE INFO ===
+  const cached = data.cached || false;
+  const cacheAgeHours = data.cache_age_hours;
+
+  return {
+    success: true,
+    error: null,
+    champion:
+      (data.champion || champion).charAt(0).toUpperCase() +
+      (data.champion || champion).slice(1),
+    champion_id: null,
+    role: data.role || role,
+    rank: data.rank || "DIAMOND+",
+    source: "api.hommet.ch",
+    runes: {
+      keystone: keystoneId,
+      keystone_icon: keystoneIcon,
+      keystone_name: keystoneName,
+      primary: primaryRunes,
+      secondary: secondaryRunes,
+      shards: shards,
+    },
+    items: {
+      starting: startingItems.filter(Boolean),
+      core: coreItems.filter(Boolean),
+      boots: boots,
+      full_build: fullBuildItems.filter(Boolean),
+      situational: situationalItems.filter(Boolean),
+    },
+    skills: { order: skillOrder },
+    summoners: summoners,
+    winrate: winrate,
+    games: games,
+    cached: cached,
+    cache_age_hours: cacheAgeHours,
+  };
 }
 
 /**
@@ -863,117 +896,182 @@ const DDRAGON_PERK_BASE = 'https://ddragon.leagueoflegends.com/cdn/img/';
 
 // Rune paths mapping
 const RUNE_PATHS = {
-    // Precision Tree
-    8000: 'perk-images/Styles/7201_Precision.png',
-    8005: 'perk-images/Styles/Precision/PressTheAttack/PressTheAttack.png',
-    8008: 'perk-images/Styles/Precision/LethalTempo/LethalTempoTemp.png',
-    8021: 'perk-images/Styles/Precision/FleetFootwork/FleetFootwork.png',
-    8010: 'perk-images/Styles/Precision/Conqueror/Conqueror.png',
-    9101: 'perk-images/Styles/Precision/Triumph.png',
-    9111: 'perk-images/Styles/Precision/Triumph.png',
-    8009: 'perk-images/Styles/Precision/Overheal.png',
-    8014: 'perk-images/Styles/Precision/CoupDeGrace/CoupDeGrace.png',
-    9104: 'perk-images/Styles/Precision/LegendAlacrity/LegendAlacrity.png',
-    9105: 'perk-images/Styles/Precision/LegendTenacity/LegendTenacity.png',
-    9103: 'perk-images/Styles/Precision/LegendBloodline/LegendBloodline.png',
-    8017: 'perk-images/Styles/Precision/CutDown/CutDown.png',
-    8299: 'perk-images/Styles/Precision/LastStand/LastStand.png',
-    // Domination Tree
-    8100: 'perk-images/Styles/7200_Domination.png',
-    8112: 'perk-images/Styles/Domination/Electrocute/Electrocute.png',
-    8124: 'perk-images/Styles/Domination/Predator/Predator.png',
-    8128: 'perk-images/Styles/Domination/DarkHarvest/DarkHarvest.png',
-    9923: 'perk-images/Styles/Domination/HailOfBlades/HailOfBlades.png',
-    8126: 'perk-images/Styles/Domination/CheapShot/CheapShot.png',
-    8139: 'perk-images/Styles/Domination/TasteOfBlood/GreenTerror_TasteOfBlood.png',
-    8143: 'perk-images/Styles/Domination/SuddenImpact/SuddenImpact.png',
-    8136: 'perk-images/Styles/Domination/ZombieWard/ZombieWard.png',
-    8120: 'perk-images/Styles/Domination/GhostPoro/GhostPoro.png',
-    8138: 'perk-images/Styles/Domination/EyeballCollection/EyeballCollection.png',
-    8135: 'perk-images/Styles/Domination/TreasureHunter/TreasureHunter.png',
-    8134: 'perk-images/Styles/Domination/IngeniousHunter/IngeniousHunter.png',
-    8105: 'perk-images/Styles/Domination/RelentlessHunter/RelentlessHunter.png',
-    8106: 'perk-images/Styles/Domination/UltimateHunter/UltimateHunter.png',
-    // Sorcery Tree
-    8200: 'perk-images/Styles/7202_Sorcery.png',
-    8214: 'perk-images/Styles/Sorcery/SummonAery/SummonAery.png',
-    8229: 'perk-images/Styles/Sorcery/ArcaneComet/ArcaneComet.png',
-    8230: 'perk-images/Styles/Sorcery/PhaseRush/PhaseRush.png',
-    8224: 'perk-images/Styles/Sorcery/NullifyingOrb/Pokeshield.png',
-    8226: 'perk-images/Styles/Sorcery/ManaflowBand/ManaflowBand.png',
-    8275: 'perk-images/Styles/Sorcery/NimbusCloak/6361.png',
-    8210: 'perk-images/Styles/Sorcery/Transcendence/Transcendence.png',
-    8234: 'perk-images/Styles/Sorcery/Celerity/CelerityTemp.png',
-    8233: 'perk-images/Styles/Sorcery/AbsoluteFocus/AbsoluteFocus.png',
-    8237: 'perk-images/Styles/Sorcery/Scorch/Scorch.png',
-    8232: 'perk-images/Styles/Sorcery/Waterwalking/Waterwalking.png',
-    8236: 'perk-images/Styles/Sorcery/GatheringStorm/GatheringStorm.png',
-    // Resolve Tree
-    8400: 'perk-images/Styles/7204_Resolve.png',
-    8437: 'perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png',
-    8439: 'perk-images/Styles/Resolve/VeteranAftershock/VeteranAftershock.png',
-    8465: 'perk-images/Styles/Resolve/Guardian/Guardian.png',
-    8446: 'perk-images/Styles/Resolve/Demolish/Demolish.png',
-    8463: 'perk-images/Styles/Resolve/FontOfLife/FontOfLife.png',
-    8401: 'perk-images/Styles/Resolve/MirrorShell/MirrorShell.png',
-    8429: 'perk-images/Styles/Resolve/Conditioning/Conditioning.png',
-    8444: 'perk-images/Styles/Resolve/SecondWind/SecondWind.png',
-    8473: 'perk-images/Styles/Resolve/BonePlating/BonePlating.png',
-    8451: 'perk-images/Styles/Resolve/Overgrowth/Overgrowth.png',
-    8453: 'perk-images/Styles/Resolve/Revitalize/Revitalize.png',
-    8242: 'perk-images/Styles/Resolve/Unflinching/Unflinching.png',
-    // Inspiration Tree
-    8300: 'perk-images/Styles/7203_Inspiration.png',
-    8351: 'perk-images/Styles/Inspiration/GlacialAugment/GlacialAugment.png',
-    8360: 'perk-images/Styles/Inspiration/UnsealedSpellbook/UnsealedSpellbook.png',
-    8369: 'perk-images/Styles/Inspiration/FirstStrike/FirstStrike.png',
-    8306: 'perk-images/Styles/Inspiration/HextechFlashtraption/HextechFlashtraption.png',
-    8313: 'perk-images/Styles/Inspiration/PerfectTiming/PerfectTiming.png',
-    8321: 'perk-images/Styles/Inspiration/FuturesMarket/FuturesMarket.png',
-    8316: 'perk-images/Styles/Inspiration/MinionDematerializer/MinionDematerializer.png',
-    8345: 'perk-images/Styles/Inspiration/BiscuitDelivery/BiscuitDelivery.png',
-    8410: 'https://wiki.leagueoflegends.com/en-us/images/Approach_Velocity_rune.png?eef19',
-    8352: 'perk-images/Styles/Inspiration/TimeWarpTonic/TimeWarpTonic.png',
-    8304: 'perk-images/Styles/Inspiration/MagicalFootwear/MagicalFootwear.png',
-    8347: 'perk-images/Styles/Inspiration/CosmicInsight/CosmicInsight.png',
-    // Stat Shards
-    5008: 'perk-images/StatMods/StatModsAdaptiveForceIcon.png',
-    5005: 'perk-images/StatMods/StatModsAttackSpeedIcon.png',
-    5007: 'perk-images/StatMods/StatModsCDRScalingIcon.png',
-    5001: 'perk-images/StatMods/StatModsHealthScalingIcon.png',
-    5002: 'perk-images/StatMods/StatModsArmorIcon.png',
-    5003: 'perk-images/StatMods/StatModsMagicResIcon.png',
-    5010: 'perk-images/StatMods/StatModsMovementSpeedIcon.png',
-    5011: 'perk-images/StatMods/StatModsHealthPlusIcon.png'
+  // Precision Tree
+  8000: "perk-images/Styles/7201_Precision.png",
+  8005: "perk-images/Styles/Precision/PressTheAttack/PressTheAttack.png",
+  8008: "perk-images/Styles/Precision/LethalTempo/LethalTempoTemp.png",
+  8021: "perk-images/Styles/Precision/FleetFootwork/FleetFootwork.png",
+  8010: "perk-images/Styles/Precision/Conqueror/Conqueror.png",
+  8009: "perk-images/Styles/Precision/PresenceOfMind/PresenceOfMind.png",
+  9101: "perk-images/Styles/Precision/AbsorbLife/AbsorbLife.png",
+  9111: "perk-images/Styles/Precision/Triumph.png",
+  9104: "perk-images/Styles/Precision/LegendAlacrity/LegendAlacrity.png",
+  9105: "perk-images/Styles/Precision/LegendHaste/LegendHaste.png",
+  9103: "perk-images/Styles/Precision/LegendBloodline/LegendBloodline.png",
+  8014: "perk-images/Styles/Precision/CoupDeGrace/CoupDeGrace.png",
+  8017: "perk-images/Styles/Precision/CutDown/CutDown.png",
+  8299: "https://wiki.leagueoflegends.com/en-us/images/Last_Stand_rune.png",
+
+  // Domination Tree
+  8100: "perk-images/Styles/7200_Domination.png",
+  8112: "perk-images/Styles/Domination/Electrocute/Electrocute.png",
+  8124: "perk-images/Styles/Domination/Predator/Predator.png",
+  8128: "perk-images/Styles/Domination/DarkHarvest/DarkHarvest.png",
+  9923: "perk-images/Styles/Domination/HailOfBlades/HailOfBlades.png",
+  8126: "perk-images/Styles/Domination/CheapShot/CheapShot.png",
+  8139: "perk-images/Styles/Domination/TasteOfBlood/GreenTerror_TasteOfBlood.png",
+  8143: "perk-images/Styles/Domination/SuddenImpact/SuddenImpact.png",
+  8137: "perk-images/Styles/Domination/EyeballCollection/EyeballCollection.png",
+  8140: "perk-images/Styles/Domination/GrislyMementos/GrislyMementos.png",
+  8141: "perk-images/Styles/Domination/GhostPoro/GhostPoro.png",
+  8135: "perk-images/Styles/Domination/TreasureHunter/TreasureHunter.png",
+  8105: "perk-images/Styles/Domination/RelentlessHunter/RelentlessHunter.png",
+  8106: "perk-images/Styles/Domination/UltimateHunter/UltimateHunter.png",
+
+  // Sorcery Tree
+  8200: "perk-images/Styles/7202_Sorcery.png",
+  8214: "perk-images/Styles/Sorcery/SummonAery/SummonAery.png",
+  8229: "perk-images/Styles/Sorcery/ArcaneComet/ArcaneComet.png",
+  8230: "perk-images/Styles/Sorcery/PhaseRush/PhaseRush.png",
+  8224: "perk-images/Styles/Sorcery/NullifyingOrb/Pokeshield.png",
+  8226: "perk-images/Styles/Sorcery/ManaflowBand/ManaflowBand.png",
+  8275: "perk-images/Styles/Sorcery/NimbusCloak/6361.png",
+  8210: "perk-images/Styles/Sorcery/Transcendence/Transcendence.png",
+  8234: "perk-images/Styles/Sorcery/Celerity/CelerityTemp.png",
+  8233: "perk-images/Styles/Sorcery/AbsoluteFocus/AbsoluteFocus.png",
+  8237: "perk-images/Styles/Sorcery/Scorch/Scorch.png",
+  8232: "perk-images/Styles/Sorcery/Waterwalking/Waterwalking.png",
+  8236: "perk-images/Styles/Sorcery/GatheringStorm/GatheringStorm.png",
+
+  // Resolve Tree
+  8400: "perk-images/Styles/7204_Resolve.png",
+  8437: "perk-images/Styles/Resolve/GraspOfTheUndying/GraspOfTheUndying.png",
+  8439: "perk-images/Styles/Resolve/VeteranAftershock/VeteranAftershock.png",
+  8465: "perk-images/Styles/Resolve/Guardian/Guardian.png",
+  8446: "perk-images/Styles/Resolve/Demolish/Demolish.png",
+  8463: "perk-images/Styles/Resolve/FontOfLife/FontOfLife.png",
+  8401: "https://wiki.leagueoflegends.com/en-us/images/Shield_Bash_rune.png",
+  8429: "perk-images/Styles/Resolve/Conditioning/Conditioning.png",
+  8444: "perk-images/Styles/Resolve/SecondWind/SecondWind.png",
+  8473: "perk-images/Styles/Resolve/BonePlating/BonePlating.png",
+  8451: "perk-images/Styles/Resolve/Overgrowth/Overgrowth.png",
+  8453: "perk-images/Styles/Resolve/Revitalize/Revitalize.png",
+  8242: "perk-images/Styles/Resolve/Unflinching/Unflinching.png",
+
+  // Inspiration Tree
+  8300: "perk-images/Styles/7203_Inspiration.png",
+  8351: "perk-images/Styles/Inspiration/GlacialAugment/GlacialAugment.png",
+  8360: "perk-images/Styles/Inspiration/UnsealedSpellbook/UnsealedSpellbook.png",
+  8369: "perk-images/Styles/Inspiration/FirstStrike/FirstStrike.png",
+  8306: "perk-images/Styles/Inspiration/HextechFlashtraption/HextechFlashtraption.png",
+  8304: "perk-images/Styles/Inspiration/MagicalFootwear/MagicalFootwear.png",
+  8321: "http://wiki.leagueoflegends.com/en-us/images/Cash_Back_rune.png",
+  8313: "perk-images/Styles/Inspiration/TripleTonic/TripleTonic.png",
+  8352: "perk-images/Styles/Inspiration/TimeWarpTonic/TimeWarpTonic.png",
+  8345: "perk-images/Styles/Inspiration/BiscuitDelivery/BiscuitDelivery.png",
+  8347: "perk-images/Styles/Inspiration/CosmicInsight/CosmicInsight.png",
+  8410: "https://wiki.leagueoflegends.com/en-us/images/Approach_Velocity_rune.png",
+  8316: "perk-images/Styles/Inspiration/JackOfAllTrades/JackOfAllTrades.png",
+
+  // Stat Shards
+  5008: "perk-images/StatMods/StatModsAdaptiveForceIcon.png",
+  5005: "perk-images/StatMods/StatModsAttackSpeedIcon.png",
+  5007: "perk-images/StatMods/StatModsCDRScalingIcon.png",
+  5001: "perk-images/StatMods/StatModsHealthScalingIcon.png",
+  5002: "perk-images/StatMods/StatModsArmorIcon.png",
+  5003: "perk-images/StatMods/StatModsMagicResIcon.png",
+  5010: "perk-images/StatMods/StatModsMovementSpeedIcon.png",
+  5011: "perk-images/StatMods/StatModsHealthPlusIcon.png",
 };
 
 // Rune names mapping
 const RUNE_NAMES = {
-    8000: 'Precision', 8005: 'Press the Attack', 8008: 'Lethal Tempo',
-    8021: 'Fleet Footwork', 8010: 'Conqueror', 9101: 'Triumph', 9111: 'Triumph',
-    8009: 'Overheal', 8014: 'Coup de Grace', 9104: 'Legend: Alacrity',
-    9105: 'Legend: Tenacity', 9103: 'Legend: Bloodline', 8017: 'Cut Down',
-    8299: 'Last Stand', 8100: 'Domination', 8112: 'Electrocute',
-    8124: 'Predator', 8128: 'Dark Harvest', 9923: 'Hail of Blades',
-    8126: 'Cheap Shot', 8139: 'Taste of Blood', 8143: 'Sudden Impact',
-    8136: 'Zombie Ward', 8120: 'Ghost Poro', 8138: 'Eyeball Collection',
-    8135: 'Treasure Hunter', 8134: 'Ingenious Hunter', 8105: 'Relentless Hunter',
-    8106: 'Ultimate Hunter', 8200: 'Sorcery', 8214: 'Summon Aery',
-    8229: 'Arcane Comet', 8230: 'Phase Rush', 8224: 'Nullifying Orb',
-    8226: 'Manaflow Band', 8275: 'Nimbus Cloak', 8210: 'Transcendence',
-    8234: 'Celerity', 8233: 'Absolute Focus', 8237: 'Scorch',
-    8232: 'Waterwalking', 8236: 'Gathering Storm', 8400: 'Resolve',
-    8437: 'Grasp of the Undying', 8439: 'Aftershock', 8465: 'Guardian',
-    8446: 'Demolish', 8463: 'Font of Life', 8401: 'Shield Bash',
-    8429: 'Conditioning', 8444: 'Second Wind', 8473: 'Bone Plating',
-    8451: 'Overgrowth', 8453: 'Revitalize', 8242: 'Unflinching',
-    8300: 'Inspiration', 8351: 'Glacial Augment', 8360: 'Unsealed Spellbook',
-    8369: 'First Strike', 8306: 'Hextech Flashtraption', 8304: 'Magical Footwear',
-    8313: 'Perfect Timing', 8321: "Future's Market", 8316: 'Minion Dematerializer',
-    8345: 'Biscuit Delivery', 8347: 'Cosmic Insight', 8410: 'Approach Velocity',
-    8352: 'Time Warp Tonic', 5008: 'Adaptive Force', 5005: 'Attack Speed',
-    5007: 'Ability Haste', 5001: 'Health Scaling', 5002: 'Armor',
-    5003: 'Magic Resist', 5010: 'Move Speed', 5011: 'Health'
+  // Precision
+  8000: "Precision",
+  8005: "Press the Attack",
+  8008: "Lethal Tempo",
+  8021: "Fleet Footwork",
+  8010: "Conqueror",
+  8009: "Presence of Mind",
+  9101: "Absorb Life",
+  9111: "Triumph",
+  9104: "Legend: Alacrity",
+  9105: "Legend: Haste",
+  9103: "Legend: Bloodline",
+  8014: "Coup de Grace",
+  8017: "Cut Down",
+  8299: "Last Stand",
+
+  // Domination
+  8100: "Domination",
+  8112: "Electrocute",
+  8124: "Predator",
+  8128: "Dark Harvest",
+  9923: "Hail of Blades",
+  8126: "Cheap Shot",
+  8139: "Taste of Blood",
+  8143: "Sudden Impact",
+  8137: "Sixth Sense",
+  8140: "Grisly Mementos",
+  8141: "Deep Ward",
+  8135: "Treasure Hunter",
+  8105: "Relentless Hunter",
+  8106: "Ultimate Hunter",
+
+  // Sorcery
+  8200: "Sorcery",
+  8214: "Summon Aery",
+  8229: "Arcane Comet",
+  8230: "Phase Rush",
+  8224: "Axiom Arcanist",
+  8226: "Manaflow Band",
+  8275: "Nimbus Cloak",
+  8210: "Transcendence",
+  8234: "Celerity",
+  8233: "Absolute Focus",
+  8237: "Scorch",
+  8232: "Waterwalking",
+  8236: "Gathering Storm",
+
+  // Resolve
+  8400: "Resolve",
+  8437: "Grasp of the Undying",
+  8439: "Aftershock",
+  8465: "Guardian",
+  8446: "Demolish",
+  8463: "Font of Life",
+  8401: "Shield Bash",
+  8429: "Conditioning",
+  8444: "Second Wind",
+  8473: "Bone Plating",
+  8451: "Overgrowth",
+  8453: "Revitalize",
+  8242: "Unflinching",
+
+  // Inspiration
+  8300: "Inspiration",
+  8351: "Glacial Augment",
+  8360: "Unsealed Spellbook",
+  8369: "First Strike",
+  8306: "Hextech Flashtraption",
+  8304: "Magical Footwear",
+  8321: "Cash Back",
+  8313: "Triple Tonic",
+  8352: "Time Warp Tonic",
+  8345: "Biscuit Delivery",
+  8347: "Cosmic Insight",
+  8410: "Approach Velocity",
+  8316: "Jack of All Trades",
+
+  // Stats
+  5008: "Adaptive Force",
+  5005: "Attack Speed",
+  5007: "Ability Haste",
+  5001: "Health Scaling",
+  5002: "Armor",
+  5003: "Magic Resist",
+  5010: "Move Speed",
+  5011: "Health",
 };
 
 // Spell names and files
