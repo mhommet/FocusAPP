@@ -1325,10 +1325,10 @@ function renderBuild(build) {
 }
 
 // =============================================================================
-// GLOBAL EXPORTS
+// GLOBAL EXPORTS (pour compatibilité onclick inline)
 // =============================================================================
 
-// Make functions global for inline onclick handlers
+// Export functions to window for inline onclick handlers
 window.switchTab = switchTab;
 window.refreshCurrentTab = refreshCurrentTab;
 window.refreshTierList = refreshTierList;
@@ -1345,21 +1345,117 @@ window.filterItems = filterItems;
 window.retryBackendConnection = retryBackendConnection;
 
 // =============================================================================
-// START APP
+// EVENT LISTENERS (Alternative aux onclick inline)
 // =============================================================================
 
-// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('🚀 FocusApp loaded - Attaching event listeners');
+
+    // Initialize app
     init();
 
-    // Fix: Prevent auto-select on search inputs focus (WebView behavior)
+    // ✅ REFRESH BUTTON
+    const refreshBtn = document.querySelector('.btn-refresh');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshCurrentTab);
+        console.log('✅ Refresh button attached');
+    }
+
+    // ✅ TAB BUTTONS
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            console.log(`📑 Tab clicked: ${tab}`);
+            switchTab(tab);
+        });
+    });
+    console.log(`✅ ${tabButtons.length} tab buttons attached`);
+
+    // ✅ ROLE FILTER BUTTONS
+    const roleButtons = document.querySelectorAll('.role-filter-btn-small');
+    roleButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const role = btn.dataset.role;
+            console.log(`🎯 Role clicked: ${role}`);
+            filterByRole(role);
+        });
+    });
+    console.log(`✅ ${roleButtons.length} role buttons attached`);
+
+    // ✅ SEARCH INPUT (tierlist)
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keyup', applyFilters);
+        console.log('✅ Search input attached');
+    }
+
+    // ✅ TABLE HEADERS (sorting)
+    const tableHeaders = document.querySelectorAll('#tier-list-table th[data-sort]');
+    tableHeaders.forEach(th => {
+        th.addEventListener('click', () => {
+            const column = th.dataset.sort;
+            console.log(`📊 Sorting by: ${column}`);
+            sortTable(column);
+        });
+    });
+    console.log(`✅ ${tableHeaders.length} table headers attached`);
+
+    // ✅ CHAMPION SELECT (builds tab)
+    const championSelect = document.getElementById('champion-select');
+    if (championSelect) {
+        championSelect.addEventListener('change', loadChampionBuild);
+        console.log('✅ Champion select attached');
+    }
+
+    // ✅ ROLE SELECT (builds tab)
+    const roleSelect = document.getElementById('role-select');
+    if (roleSelect) {
+        roleSelect.addEventListener('change', loadChampionBuild);
+        console.log('✅ Role select attached');
+    }
+
+    // ✅ BUILD REFRESH BUTTON
+    const buildRefreshBtn = document.getElementById('build-refresh-btn');
+    if (buildRefreshBtn) {
+        buildRefreshBtn.addEventListener('click', forceRefreshBuild);
+        console.log('✅ Build refresh button attached');
+    }
+
+    // ✅ ITEM SEARCH (items tab)
+    const itemSearch = document.getElementById('item-search');
+    if (itemSearch) {
+        itemSearch.addEventListener('keyup', filterItems);
+        console.log('✅ Item search attached');
+    }
+
+    // ✅ ITEM FILTERS (items tab)
+    const itemFilters = ['item-stat', 'item-category', 'item-price', 'item-efficiency'];
+    itemFilters.forEach(id => {
+        const filter = document.getElementById(id);
+        if (filter) {
+            filter.addEventListener('change', filterItems);
+        }
+    });
+    console.log('✅ Item filters attached');
+
+    // ✅ BACKEND RETRY BUTTON
+    const retryBtn = document.querySelector('.retry-btn-small');
+    if (retryBtn) {
+        retryBtn.addEventListener('click', retryBackendConnection);
+        console.log('✅ Retry button attached');
+    }
+
+    // Fix: Prevent auto-select on search inputs
     document.querySelectorAll('.search-input-inline, #search-input').forEach(input => {
         input.addEventListener('focus', (e) => {
-            // Delay to override any auto-select behavior
             setTimeout(() => {
                 const len = e.target.value.length;
                 e.target.setSelectionRange(len, len);
             }, 0);
         });
     });
+
+    console.log('✅ All event listeners attached successfully');
 });
+

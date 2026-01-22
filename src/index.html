@@ -7,7 +7,6 @@
     <title>FOCUS</title>
     <link rel="stylesheet" href="styles/style.css">
     <link rel="icon" type="image/png" href="assets/logo.ico">
-    <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 
@@ -17,29 +16,32 @@
             <div class="header-title">
                 <h1>FOCUS <span id="version" class="version-badge">Loading...</span></h1>
             </div>
-            <button onclick="refreshCurrentTab()" class="btn-refresh">
+            <!-- ✅ Plus de onclick -->
+            <button id="refresh-btn" class="btn-refresh">
                 <i class="fas fa-sync-alt"></i> Actualiser
             </button>
         </header>
 
         <!-- Navigation Tabs -->
         <nav class="tabs-nav">
-            <button class="tab-btn active" data-tab="tierlist" onclick="switchTab('tierlist')">
+            <!-- ✅ Plus de onclick, utilise data-tab -->
+            <button class="tab-btn active" data-tab="tierlist">
                 <i class="fas fa-trophy"></i> Tier List
             </button>
-            <button class="tab-btn" data-tab="builds" onclick="switchTab('builds')">
+            <button class="tab-btn" data-tab="builds">
                 <i class="fas fa-hammer"></i> Builds
             </button>
-            <button class="tab-btn" data-tab="items" onclick="switchTab('items')">
+            <button class="tab-btn" data-tab="items">
                 <i class="fas fa-gem"></i> Items
             </button>
         </nav>
 
-        <!-- Backend Status Banner (shown if API is down) -->
+        <!-- Backend Status Banner -->
         <div id="backend-status" class="backend-status-banner" style="display: none;">
             <i class="fas fa-exclamation-triangle"></i>
-            <span>Backend API is not running. Please start the Rust Axum server on http://localhost:8000</span>
-            <button onclick="retryBackendConnection()" class="retry-btn-small">
+            <span>Backend API is not running.</span>
+            <!-- ✅ Plus de onclick -->
+            <button class="retry-btn-small">
                 <i class="fas fa-redo"></i> Retry
             </button>
         </div>
@@ -47,41 +49,44 @@
         <!-- TIER LIST TAB -->
         <div id="tierlist-tab" class="tab-content active">
             <div class="controls-bar">
-                <!-- Role Filter Buttons -->
                 <div class="control-group role-filter-group">
                     <div class="role-filter-inline">
-                        <button class="role-filter-btn-small active" data-role="all" onclick="filterByRole('all')" title="Tous les roles">
+                        <!-- ✅ Plus de onclick, utilise data-role -->
+                        <button class="role-filter-btn-small active" data-role="all" title="Tous les roles">
                             <i class="fas fa-asterisk"></i>
                         </button>
-                        <button class="role-filter-btn-small" data-role="top" onclick="filterByRole('top')" title="Top">
-                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top.png" alt="Top" class="role-icon-small">
+                        <button class="role-filter-btn-small" data-role="top" title="Top">
+                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top.png"
+                                alt="Top" class="role-icon-small">
                         </button>
-                        <button class="role-filter-btn-small" data-role="jungle" onclick="filterByRole('jungle')" title="Jungle">
-                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle.png" alt="Jungle" class="role-icon-small">
+                        <button class="role-filter-btn-small" data-role="jungle" title="Jungle">
+                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle.png"
+                                alt="Jungle" class="role-icon-small">
                         </button>
-                        <button class="role-filter-btn-small" data-role="mid" onclick="filterByRole('mid')" title="Mid">
-                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png" alt="Mid" class="role-icon-small">
+                        <button class="role-filter-btn-small" data-role="mid" title="Mid">
+                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png"
+                                alt="Mid" class="role-icon-small">
                         </button>
-                        <button class="role-filter-btn-small" data-role="adc" onclick="filterByRole('adc')" title="ADC">
-                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png" alt="ADC" class="role-icon-small">
+                        <button class="role-filter-btn-small" data-role="adc" title="ADC">
+                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png"
+                                alt="ADC" class="role-icon-small">
                         </button>
-                        <button class="role-filter-btn-small" data-role="support" onclick="filterByRole('support')" title="Support">
-                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png" alt="Support" class="role-icon-small">
+                        <button class="role-filter-btn-small" data-role="support" title="Support">
+                            <img src="https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png"
+                                alt="Support" class="role-icon-small">
                         </button>
                     </div>
                 </div>
 
                 <div class="control-separator"></div>
-
-                <!-- Last Update Info -->
                 <div class="control-group">
                     <span id="tierlist-last-update" class="last-update-badge"></span>
                 </div>
 
-                <!-- Search -->
                 <div class="control-group search-group">
                     <label for="search-input"><i class="fas fa-search"></i> Recherche</label>
-                    <input type="text" id="search-input" placeholder="Chercher un champion..." onkeyup="applyFilters()">
+                    <!-- ✅ Plus de onkeyup -->
+                    <input type="text" id="search-input" placeholder="Chercher un champion...">
                 </div>
             </div>
 
@@ -90,13 +95,16 @@
                     <table id="tier-list-table">
                         <thead>
                             <tr>
-                                <th onclick="sortTable('rank')" title="Trier par rang"># <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable('name')" title="Trier par nom">Champion <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable('role')" title="Trier par role">Roles <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable('tier')" title="Trier par tier">Tier <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable('winrate')" title="Trier par winrate">Winrate <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable('pickrate')" title="Trier par pickrate">Pickrate <i class="fas fa-sort"></i></th>
-                                <th onclick="sortTable('games')" title="Trier par games">Games <i class="fas fa-sort"></i></th>
+                                <!-- ✅ Plus de onclick, utilise data-sort -->
+                                <th data-sort="rank" title="Trier par rang"># <i class="fas fa-sort"></i></th>
+                                <th data-sort="name" title="Trier par nom">Champion <i class="fas fa-sort"></i></th>
+                                <th data-sort="role" title="Trier par role">Roles <i class="fas fa-sort"></i></th>
+                                <th data-sort="tier" title="Trier par tier">Tier <i class="fas fa-sort"></i></th>
+                                <th data-sort="winrate" title="Trier par winrate">Winrate <i class="fas fa-sort"></i>
+                                </th>
+                                <th data-sort="pickrate" title="Trier par pickrate">Pickrate <i class="fas fa-sort"></i>
+                                </th>
+                                <th data-sort="games" title="Trier par games">Games <i class="fas fa-sort"></i></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -105,7 +113,6 @@
                             </tr>
                         </tbody>
                     </table>
-                    <!-- Pagination -->
                     <div id="pagination" class="pagination"></div>
                 </div>
             </main>
@@ -116,7 +123,8 @@
             <div class="controls-bar">
                 <div class="control-group">
                     <label for="champion-select"><i class="fas fa-user"></i> Champion</label>
-                    <select id="champion-select" onchange="loadChampionBuild()">
+                    <!-- ✅ Plus de onchange -->
+                    <select id="champion-select">
                         <option value="">-- Selectionner --</option>
                     </select>
                 </div>
@@ -125,7 +133,8 @@
 
                 <div class="control-group">
                     <label for="role-select"><i class="fas fa-map"></i> Role</label>
-                    <select id="role-select" onchange="loadChampionBuild()">
+                    <!-- ✅ Plus de onchange -->
+                    <select id="role-select">
                         <option value="top">Top</option>
                         <option value="jungle">Jungle</option>
                         <option value="mid">Mid</option>
@@ -136,19 +145,17 @@
 
                 <div class="control-separator"></div>
 
-                <!-- Refresh Button -->
                 <div class="control-group">
-                    <button id="build-refresh-btn" class="btn-refresh-small" onclick="forceRefreshBuild()" title="Force refresh data">
+                    <!-- ✅ Plus de onclick -->
+                    <button id="build-refresh-btn" class="btn-refresh-small" title="Force refresh data">
                         <i class="fas fa-sync-alt"></i> Refresh
                     </button>
                 </div>
 
-                <!-- Cache Info -->
                 <div class="control-group">
                     <span id="build-cache-info" class="cache-info-badge"></span>
                 </div>
 
-                <!-- Data Quality Indicator -->
                 <div class="control-group">
                     <span id="build-quality-indicator" class="quality-indicator"></span>
                 </div>
@@ -166,21 +173,19 @@
 
         <!-- ITEMS TAB -->
         <div id="items-tab" class="tab-content">
-            <!-- FILTRES SUR UNE SEULE LIGNE -->
             <div class="controls-bar items-controls-bar">
-
-                <!-- Recherche par nom -->
                 <div class="search-group-inline">
                     <i class="fas fa-search"></i>
-                    <input type="text" id="item-search" placeholder="Search items..." class="search-input-inline" onkeyup="filterItems()">
+                    <!-- ✅ Plus de onkeyup -->
+                    <input type="text" id="item-search" placeholder="Search items..." class="search-input-inline">
                 </div>
 
                 <div class="control-separator"></div>
 
-                <!-- Filtre par stat -->
                 <div class="filter-group-inline">
                     <label for="item-stat"><i class="fas fa-filter"></i> Stat:</label>
-                    <select id="item-stat" class="filter-select-inline" onchange="filterItems()">
+                    <!-- ✅ Plus de onchange -->
+                    <select id="item-stat" class="filter-select-inline">
                         <option value="all">All Stats</option>
                         <option value="ad">Attack Damage</option>
                         <option value="ap">Ability Power</option>
@@ -194,10 +199,9 @@
 
                 <div class="control-separator"></div>
 
-                <!-- Filtre par categorie -->
                 <div class="filter-group-inline">
                     <label for="item-category"><i class="fas fa-layer-group"></i> Type:</label>
-                    <select id="item-category" class="filter-select-inline" onchange="filterItems()">
+                    <select id="item-category" class="filter-select-inline">
                         <option value="all">All</option>
                         <option value="legendary">Legendary</option>
                         <option value="epic">Epic</option>
@@ -207,10 +211,9 @@
 
                 <div class="control-separator"></div>
 
-                <!-- Filtre par prix -->
                 <div class="filter-group-inline">
                     <label for="item-price"><i class="fas fa-coins"></i> Price:</label>
-                    <select id="item-price" class="filter-select-inline" onchange="filterItems()">
+                    <select id="item-price" class="filter-select-inline">
                         <option value="all">All</option>
                         <option value="0-1000">&lt; 1000g</option>
                         <option value="1000-2000">1-2k</option>
@@ -221,10 +224,9 @@
 
                 <div class="control-separator"></div>
 
-                <!-- Filtre par efficacite -->
                 <div class="filter-group-inline">
                     <label for="item-efficiency"><i class="fas fa-percent"></i> Eff:</label>
-                    <select id="item-efficiency" class="filter-select-inline" onchange="filterItems()">
+                    <select id="item-efficiency" class="filter-select-inline">
                         <option value="all">All</option>
                         <option value="high">&ge;100%</option>
                         <option value="medium">90-99%</option>
@@ -234,7 +236,6 @@
 
                 <div class="control-separator"></div>
 
-                <!-- Patch version -->
                 <span id="items-patch-version" class="version-badge">Patch ...</span>
             </div>
 
@@ -243,13 +244,13 @@
                     <div id="items-grid" class="items-grid">
                         <div class="loading-cell">En attente des donnees...</div>
                     </div>
-                    <!-- Pagination Items -->
                     <div id="items-pagination" class="pagination"></div>
                 </div>
             </main>
         </div>
     </div>
 
+    <!-- ✅ Script EN DERNIER -->
     <script type="module" src="scripts/main.js"></script>
 </body>
 
