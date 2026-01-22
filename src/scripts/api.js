@@ -894,6 +894,7 @@ export async function verifyBackendConnection() {
 
 const DDRAGON_PERK_BASE = 'https://ddragon.leagueoflegends.com/cdn/img/';
 
+
 // Rune paths mapping
 const RUNE_PATHS = {
   // Precision Tree
