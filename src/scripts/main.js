@@ -1014,6 +1014,263 @@ function showToast(message, type = 'info') {
     setTimeout(() => toast.remove(), 3000);
 }
 
+// =============================================================================
+// LEAGUE CLIENT IMPORT FUNCTIONALITY
+// =============================================================================
+
+/**
+ * Import the current build into the League of Legends client.
+ *
+ * ## Third-Party Application Compliance
+ *
+ * This function is designed to comply with Riot Games' third-party application policy:
+ * - It is ONLY triggered by explicit user action (clicking the "Import Build" button)
+ * - It makes a SINGLE request per user action (no loops, no spam, no automation)
+ * - It only uses the official League Client local API endpoints
+ * - It does NOT send any keyboard or mouse inputs to the game
+ * - The same configurations can be set manually in the client
+ *
+ * The purpose is to help players configure their rune pages and item sets faster,
+ * NOT to provide any unfair competitive advantage. All data imported is publicly
+ * available and can be configured manually.
+ *
+ * Reference: https://support-leagueoflegends.riotgames.com/hc/en-us/articles/225266848-Third-Party-Applications
+ *
+ * @returns {Promise<void>}
+ */
+async function importBuildToClient() {
+    console.log('[Import] Button clicked, currentBuild:', currentBuild);
+
+    // Validate that we have a build to import
+    if (!currentBuild) {
+        showToast('No build selected. Please select a champion first.', 'error');
+        return;
+    }
+
+    // Get the import button and show loading state
+    const importBtn = document.getElementById('import-build-btn');
+    if (importBtn) {
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Importing...';
+    }
+
+    try {
+        // Check if Tauri invoke is available
+        if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
+            console.error('[Import] Tauri API not available');
+            throw new Error('Tauri API not available. Are you running in the Tauri app?');
+        }
+
+        console.log('[Import] Tauri API available, building payload...');
+
+        // Build the full payload for FocusApi /lol/import-payload
+        const payload = buildImportPayload(currentBuild);
+
+        console.log('[Import] Payload built:', JSON.stringify(payload, null, 2));
+
+        // Call the Tauri command (single request, no loops)
+        console.log('[Import] Calling Tauri command import_build_to_client...');
+        const result = await window.__TAURI__.core.invoke('import_build_to_client', {
+            payload: payload
+        });
+
+        console.log('[Import] Result:', result);
+
+        // Show appropriate feedback based on result
+        if (result.success) {
+            let message = 'Build imported successfully!';
+            if (result.runes_imported && result.items_imported) {
+                message = 'Runes and items imported!';
+            } else if (result.runes_imported) {
+                message = 'Rune page imported!';
+            } else if (result.items_imported) {
+                message = 'Item set imported!';
+            }
+            showToast(message, 'success');
+        } else {
+            showToast(result.message || 'Import failed', 'error');
+        }
+
+    } catch (error) {
+        console.error('[Import] Error caught:', error);
+        console.error('[Import] Error type:', typeof error);
+        console.error('[Import] Error keys:', error ? Object.keys(error) : 'null');
+
+        // Handle specific error codes from the Tauri command
+        let errorMessage = 'Failed to import build';
+
+        // Tauri errors come as objects with code and message
+        if (typeof error === 'object' && error !== null) {
+            if (error.code === 'CLIENT_NOT_RUNNING') {
+                errorMessage = 'League Client not running. Start the client first!';
+            } else if (error.code === 'API_ERROR' || error.code === 'HTTP_ERROR') {
+                errorMessage = error.message || 'API error';
+            } else if (error.code === 'PARSE_ERROR') {
+                errorMessage = 'Invalid response from server';
+            } else if (error.message) {
+                errorMessage = error.message;
+            } else {
+                errorMessage = JSON.stringify(error);
+            }
+        } else if (typeof error === 'string') {
+            errorMessage = error;
+        }
+
+        console.error('[Import] Showing error toast:', errorMessage);
+        showToast(errorMessage, 'error');
+    } finally {
+        // Restore button state
+        if (importBtn) {
+            importBtn.disabled = false;
+            importBtn.innerHTML = '<i class="fas fa-download"></i> Import to LoL';
+        }
+    }
+}
+
+/**
+ * Build the import payload from the current build data.
+ * Transforms the frontend build structure into the FocusApi request format.
+ *
+ * @param {Object} build - The current build data
+ * @returns {Object} The payload for FocusApi /lol/import-payload
+ */
+function buildImportPayload(build) {
+    // Get role from build, UI selector, or default to 'mid' (most common fallback)
+    let role = build.role || document.getElementById('role-select')?.value || 'default';
+
+    // Normalize role for Practice Tool or when no role is set
+    if (role === 'default' || role === '' || !role) {
+        // Use the role from the UI if available, otherwise fallback to 'mid'
+        role = document.getElementById('role-select')?.value || 'mid';
+        console.log('[Import] No role detected, using fallback:', role);
+    }
+
+    // Extract rune tree IDs from keystone (primary) and first secondary rune
+    // Keystone IDs: 8000 (Precision), 8100 (Domination), 8200 (Sorcery), 8300 (Inspiration), 8400 (Resolve)
+    const keystoneId = build.runes?.keystone || 0;
+    const primaryTreeId = Math.floor(keystoneId / 100) * 100; // e.g., 8010 -> 8000
+
+    // Get secondary tree from first secondary rune
+    const firstSecondaryRune = build.runes?.secondary?.[0];
+    const secondaryTreeId = firstSecondaryRune ? Math.floor(firstSecondaryRune.id / 100) * 100 : 8200;
+
+    // Extract primary rune IDs (keystone + 3 primary runes)
+    const primaryRuneIds = [
+        keystoneId,
+        ...(build.runes?.primary || []).map(r => r.id || r)
+    ].filter(id => id);
+
+    // Extract secondary rune IDs (2 runes)
+    const secondaryRuneIds = (build.runes?.secondary || [])
+        .map(r => r.id || r)
+        .filter(id => id);
+
+    // Extract stat shards (3 shards)
+    const runeShards = (build.runes?.shards || build.stat_shards || [])
+        .map(s => s.id || s)
+        .filter(id => id);
+
+    // Extract item IDs
+    const itemsStarting = (build.items?.starting || [])
+        .map(i => parseInt(i.id || i, 10))
+        .filter(id => !isNaN(id));
+
+    const itemsCore = (build.items?.core || [])
+        .map(i => parseInt(i.id || i, 10))
+        .filter(id => !isNaN(id));
+
+    const itemsSituational = [
+        ...(build.items?.full_build || []),
+        ...(build.items?.situational || [])
+    ]
+        .map(i => parseInt(i.id || i, 10))
+        .filter(id => !isNaN(id));
+
+    const bootsId = build.items?.boots
+        ? parseInt(build.items.boots.id || build.items.boots, 10)
+        : null;
+
+    // Extract summoner spells
+    const summonerSpells = (build.summoners || [])
+        .map(s => s.id || s)
+        .filter(id => id);
+
+    // Get champion ID from the champion list if available
+    const championData = allChampions.find(c =>
+        c.name?.toLowerCase() === build.champion?.toLowerCase() ||
+        c.id?.toLowerCase() === build.champion?.toLowerCase()
+    );
+    const championId = championData?.key ? parseInt(championData.key, 10) : 0;
+
+    return {
+        boots: bootsId,
+        champion_id: championId,
+        champion_key: build.champion,
+        items_core: itemsCore,
+        items_situational: itemsSituational,
+        items_starting: itemsStarting,
+        patch: build.patch || "current",
+        role: role,
+        rune_shards: runeShards,
+        runes_primary: {
+            rune_ids: primaryRuneIds,
+            tree_id: primaryTreeId
+        },
+        runes_secondary: {
+            rune_ids: secondaryRuneIds,
+            tree_id: secondaryTreeId
+        },
+        source: "FocusApp",
+        summoner_spells: summonerSpells,
+        title: `${build.champion} ${role.toUpperCase()}`
+    };
+}
+
+/**
+ * Check if the League Client is currently running.
+ * Updates the import button state accordingly.
+ *
+ * @returns {Promise<boolean>} Whether the client is running
+ */
+async function checkLeagueClientStatus() {
+    try {
+        if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
+            console.log('[Import] Tauri not available for client check');
+            return false;
+        }
+
+        const isRunning = await window.__TAURI__.core.invoke('is_league_client_running');
+        console.log('[Import] League Client running:', isRunning);
+        return isRunning;
+    } catch (error) {
+        console.warn('[Import] Could not check League Client status:', error);
+        return false;
+    }
+}
+
+/**
+ * Update the import button state based on League Client status.
+ * Called after rendering a build to enable/disable the button.
+ */
+async function updateImportButtonState() {
+    const importBtn = document.getElementById('import-build-btn');
+    if (!importBtn) return;
+
+    const isClientRunning = await checkLeagueClientStatus();
+
+    if (isClientRunning) {
+        importBtn.disabled = false;
+        importBtn.innerHTML = '<i class="fas fa-download"></i> Import to LoL';
+        importBtn.title = 'Import runes and item set to League Client';
+        importBtn.classList.remove('btn-disabled');
+    } else {
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<i class="fas fa-plug"></i> LoL Client Offline';
+        importBtn.title = 'Start League of Legends client to enable import';
+        importBtn.classList.add('btn-disabled');
+    }
+}
+
 /**
  * Deduplicate items by ID.
  * Removes duplicate items from an array, keeping only the first occurrence.
@@ -1311,6 +1568,12 @@ function renderBuild(build) {
                     Diamond+ Data
                 </div>
             </div>
+            <!-- Import to LoL button - Requires explicit user click (compliance with Riot ToS) -->
+            <div class="build-actions">
+                <button id="import-build-btn" class="btn btn-import" onclick="importBuildToClient()" title="Import runes and item set to League Client">
+                    <i class="fas fa-download"></i> Import to LoL
+                </button>
+            </div>
         </div>
 
         <div class="build-sections">
@@ -1322,6 +1585,9 @@ function renderBuild(build) {
             ${itemsHtml}
         </div>
     `;
+
+    // Update import button state based on League Client status
+    updateImportButtonState();
 }
 
 // =============================================================================
@@ -1343,6 +1609,8 @@ window.goToItemsPage = goToItemsPage;
 window.applyFilters = applyFilters;
 window.filterItems = filterItems;
 window.retryBackendConnection = retryBackendConnection;
+window.importBuildToClient = importBuildToClient;
+window.updateImportButtonState = updateImportButtonState;
 
 // =============================================================================
 // EVENT LISTENERS (Alternative aux onclick inline)
@@ -1353,6 +1621,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize app
     init();
+
+    // Periodically check League Client status to update import button
+    // Check every 5 seconds to keep button state accurate
+    setInterval(() => {
+        const importBtn = document.getElementById('import-build-btn');
+        if (importBtn) {
+            updateImportButtonState();
+        }
+    }, 5000);
 
     // ✅ REFRESH BUTTON
     const refreshBtn = document.querySelector('.btn-refresh');

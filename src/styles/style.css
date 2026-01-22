@@ -671,6 +671,56 @@ tbody tr:last-child td {
   color: var(--danger-color);
 }
 
+/* Build Actions (Import Button) */
+.build-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.btn-import {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, var(--accent-color) 0%, #e8c866 100%);
+  color: var(--bg-primary);
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-import:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(249, 226, 175, 0.4);
+}
+
+.btn-import:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-import:disabled,
+.btn-import.btn-disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: linear-gradient(135deg, #6c7086 0%, #585b70 100%);
+  color: var(--text-secondary);
+}
+
+.btn-import:disabled:hover,
+.btn-import.btn-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-import i {
+  font-size: 1rem;
+}
+
 .build-sections {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
