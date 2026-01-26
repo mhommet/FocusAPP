@@ -69,11 +69,39 @@ let championListLoaded = false;
 /** @type {Object|null} Currently displayed build */
 let currentBuild = null;
 
+/** @type {Array<Object>} All champions for build selector (separate from tierlist) */
+let buildChampions = [];
+
+/** @type {Array<Object>} Filtered champions for build selector grid */
+let filteredChampionsBuild = [];
+
+/** @type {string|null} Currently selected champion ID */
+let selectedChampion = null;
+
+/** @type {string|null} Currently selected champion name */
+let selectedChampionName = null;
+
 /** @type {boolean} Whether backend is connected */
 let backendConnected = false;
 
 /** @type {number} Build request ID counter - used to ignore stale responses */
 let buildRequestId = 0;
+
+// =============================================================================
+// AUTO-IMPORT STATE
+// =============================================================================
+
+/** @type {boolean} Whether auto-import is enabled */
+let autoImportEnabled = false;
+
+/** @type {number|null} Interval ID for Live Client Data polling */
+let autoImportPollInterval = null;
+
+/** @type {string|null} Last detected champion ID to prevent duplicate imports */
+let lastAutoImportedChampion = null;
+
+/** @type {boolean} Whether we're currently in champion select */
+let inChampionSelect = false;
 
 // =============================================================================
 // INITIALIZATION
@@ -162,7 +190,7 @@ function switchTab(tabName) {
         refreshItems();
     }
     if (tabName === 'builds' && !championListLoaded) {
-        loadChampionList();
+        loadChampionGrid();
     }
 }
 
@@ -322,6 +350,7 @@ function applyFilters(resetPage = true) {
 
     updateTable(pageData);
     updatePagination(totalPages);
+    updateSortIndicators();
 }
 
 /**
@@ -339,6 +368,27 @@ function sortTable(column) {
     }
     currentPage = 1;
     applyFilters();
+    updateSortIndicators();
+}
+
+/**
+ * Update sort indicators on table headers.
+ */
+function updateSortIndicators() {
+    const headers = document.querySelectorAll('#tier-list-table th[data-sort]');
+    headers.forEach(th => {
+        const column = th.dataset.sort;
+        const icon = th.querySelector('i');
+        if (icon) {
+            if (column === currentSort.column) {
+                icon.className = currentSort.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                th.classList.add('sorted');
+            } else {
+                icon.className = 'fas fa-sort';
+                th.classList.remove('sorted');
+            }
+        }
+    });
 }
 
 /**
@@ -361,8 +411,10 @@ function updateTable(champions) {
             const roleDisplay = roleIcon
                 ? `<span class="role-cell"><img src="${roleIcon}" alt="${champ.role}" class="role-icon-small" onerror="this.style.display='none'"> ${champ.role}</span>`
                 : champ.role;
+            // Normalize role for build navigation
+            const normalizedRole = normalizeRoleForBuild(champ.role);
             return `
-        <tr>
+        <tr class="champion-row clickable" data-champion="${champ.name}" data-role="${normalizedRole}" title="Click to view ${champ.name} build">
             <td>#${champ.rank}</td>
             <td><strong>${champ.name}</strong></td>
             <td>${roleDisplay}</td>
@@ -374,6 +426,15 @@ function updateTable(champions) {
     `;
         })
         .join('');
+
+    // Add click handlers for navigation to builds
+    tbody.querySelectorAll('.champion-row').forEach(row => {
+        row.addEventListener('click', () => {
+            const championName = row.dataset.champion;
+            const role = row.dataset.role;
+            navigateToBuildForChampion(championName, role);
+        });
+    });
 }
 
 function getTierClass(tier) {
@@ -388,36 +449,50 @@ function getTierClass(tier) {
 
 /**
  * Format winrate for display.
- * Backend sends decimal (0.833 = 83.3%)
+ * Backend sends decimal (0.533 = 53.3%) or 1 = 100%
  * @param {number|string} winrate - Winrate value
  * @returns {string} Formatted winrate with %
  */
 function formatWinrate(winrate) {
     if (winrate === null || winrate === undefined || winrate === '-') return '-';
-    const value = typeof winrate === 'string' ? parseFloat(winrate.replace('%', '')) : winrate;
-    // If already in percentage format (>1), just format it
-    if (value > 1) {
-        return value.toFixed(1) + '%';
+    let value = typeof winrate === 'string' ? parseFloat(winrate.replace('%', '')) : winrate;
+
+    // Backend sends decimal: 0.533 = 53.3%, 1 = 100%
+    // Multiply by 100 to get percentage
+    const percent = value * 100;
+
+    // Format with 2 decimals
+    if (percent >= 99.995) {
+        return '100%';
+    } else if (percent < 1) {
+        return '<1%';
+    } else {
+        return percent.toFixed(2) + '%';
     }
-    // If decimal format (0.833 = 83.3%), multiply by 100
-    return (value * 100).toFixed(1) + '%';
 }
 
 /**
  * Format pickrate for display.
- * Backend sends decimal (0.05 = 5%)
+ * Backend sends decimal (0.015 = 1.5%)
  * @param {number|string} pickrate - Pickrate value
  * @returns {string} Formatted pickrate with %
  */
 function formatPickrate(pickrate) {
     if (pickrate === null || pickrate === undefined || pickrate === '-') return '-';
-    const value = typeof pickrate === 'string' ? parseFloat(pickrate.replace('%', '')) : pickrate;
-    // If already in percentage format (>1), just format it
-    if (value > 1) {
-        return value.toFixed(1) + '%';
+    let value = typeof pickrate === 'string' ? parseFloat(pickrate.replace('%', '')) : pickrate;
+
+    // Backend sends decimal: 0.015 = 1.5%
+    // Multiply by 100 to get percentage
+    const percent = value * 100;
+
+    // Format with appropriate precision
+    if (percent < 1) {
+        return '<1%';
+    } else if (percent < 10) {
+        return percent.toFixed(2) + '%';
+    } else {
+        return percent.toFixed(1) + '%';
     }
-    // If decimal format (0.05 = 5%), multiply by 100
-    return (value * 100).toFixed(1) + '%';
 }
 
 /**
@@ -741,25 +816,115 @@ function goToItemsPage(page) {
 // =============================================================================
 
 /**
- * Load champion list for the build selector dropdown.
+ * Load champion grid for the build selector.
+ * Replaces the old dropdown with a searchable icon grid.
  * @returns {Promise<void>}
  */
-async function loadChampionList() {
-    const select = document.getElementById('champion-select');
-    if (!select) return;
-    select.innerHTML = '<option value="">Loading...</option>';
+async function loadChampionGrid() {
+    const searchInput = document.getElementById('champion-search');
+    const grid = document.getElementById('champion-grid');
 
-    const champions = await getChampionList();
+    if (!searchInput || !grid) return;
 
-    if (champions && champions.length > 0) {
-        select.innerHTML = '<option value="">-- Select Champion --</option>';
-        champions.forEach((champ) => {
-            select.innerHTML += `<option value="${champ.name}" data-id="${champ.id}" data-image="${champ.image}">${champ.name}</option>`;
-        });
-        championListLoaded = true;
-    } else {
-        select.innerHTML = '<option value="">Failed to load</option>';
+    // Show loading state
+    grid.innerHTML = '<div class="search-empty"><i class="fas fa-spinner fa-spin"></i>Loading champions...</div>';
+    grid.classList.add('visible');
+
+    // Load champions list (separate from tierlist data)
+    if (buildChampions.length === 0) {
+        const champions = await getChampionList();
+        if (champions && champions.length > 0) {
+            buildChampions = champions;
+        }
     }
+
+    if (buildChampions.length === 0) {
+        grid.innerHTML = '<div class="search-empty"><i class="fas fa-exclamation-triangle"></i>Failed to load champions</div>';
+        return;
+    }
+
+    filteredChampionsBuild = [...buildChampions];
+    updateChampionGrid();
+    championListLoaded = true;
+
+    // Hide grid initially
+    grid.classList.remove('visible');
+}
+
+/**
+ * Update the champion grid with filtered results.
+ * @returns {void}
+ */
+function updateChampionGrid() {
+    const grid = document.getElementById('champion-grid');
+    if (!grid) return;
+
+    if (filteredChampionsBuild.length === 0) {
+        grid.innerHTML = '<div class="search-empty"><i class="fas fa-search"></i>Aucun champion trouve</div>';
+        return;
+    }
+
+    grid.innerHTML = filteredChampionsBuild.map(champ => `
+        <button class="champ-btn ${selectedChampion === champ.id ? 'active' : ''}"
+                data-id="${champ.id}"
+                data-name="${champ.name}"
+                title="${champ.name}">
+            <img src="${champ.image}" alt="${champ.name}"
+                 onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Aatrox.png'">
+            <div class="champ-name">${champ.name}</div>
+        </button>
+    `).join('');
+
+    // Add click handlers to all champion buttons
+    grid.querySelectorAll('.champ-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const champId = btn.dataset.id;
+            const champName = btn.dataset.name;
+            selectChampion(champId, champName);
+        });
+    });
+}
+
+/**
+ * Select a champion from the grid and load their build.
+ * @param {string} champId - Champion ID
+ * @param {string} champName - Champion name
+ * @returns {Promise<void>}
+ */
+async function selectChampion(champId, champName) {
+    selectedChampion = champId;
+    selectedChampionName = champName;
+
+    // Update UI
+    const searchInput = document.getElementById('champion-search');
+    const grid = document.getElementById('champion-grid');
+
+    if (searchInput) {
+        searchInput.value = champName;
+        // Update clear button visibility
+        const wrapper = searchInput.closest('.search-input-wrapper');
+        if (wrapper) {
+            wrapper.classList.add('has-value');
+        }
+    }
+
+    // Update active state
+    document.querySelectorAll('.champ-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.id === champId);
+    });
+
+    // Hide the grid
+    if (grid) {
+        grid.classList.remove('visible');
+    }
+
+    // Load the build
+    await loadChampionBuild(champName);
+}
+
+// Legacy function name for compatibility
+async function loadChampionList() {
+    await loadChampionGrid();
 }
 
 // =============================================================================
@@ -770,10 +935,12 @@ async function loadChampionList() {
  * Load and display champion build from the API.
  * Uses Diamond+ aggregated data for optimal statistics.
  * Uses request ID to ignore stale responses when user changes selection quickly.
+ * @param {string|null} champNameOverride - Optional champion name to use instead of input value
  * @returns {Promise<void>}
  */
-async function loadChampionBuild() {
-    const championName = document.getElementById('champion-select').value;
+async function loadChampionBuild(champNameOverride = null) {
+    const searchInput = document.getElementById('champion-search');
+    const championName = champNameOverride || searchInput?.value || selectedChampionName;
     const lane = document.getElementById('role-select').value;
     const container = document.getElementById('build-container');
     const cacheInfo = document.getElementById('build-cache-info');
@@ -849,7 +1016,8 @@ async function loadChampionBuild() {
  * @returns {Promise<void>}
  */
 async function forceRefreshBuild() {
-    const championName = document.getElementById('champion-select').value;
+    const searchInput = document.getElementById('champion-search');
+    const championName = searchInput?.value || selectedChampionName;
     const lane = document.getElementById('role-select').value;
     const container = document.getElementById('build-container');
     const refreshBtn = document.getElementById('build-refresh-btn');
@@ -1005,13 +1173,21 @@ function showToast(message, type = 'info') {
     const existingToast = document.querySelector('.toast-notification');
     if (existingToast) existingToast.remove();
 
+    const iconMap = {
+        'success': 'check-circle',
+        'error': 'exclamation-circle',
+        'warning': 'exclamation-triangle',
+        'info': 'info-circle'
+    };
+
     const toast = document.createElement('div');
     toast.className = `toast-notification toast-${type}`;
-    toast.innerHTML = `<i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i> ${message}`;
+    toast.innerHTML = `<i class="fas fa-${iconMap[type] || 'info-circle'}"></i> ${message}`;
     document.body.appendChild(toast);
 
-    // Auto remove after 3 seconds
-    setTimeout(() => toast.remove(), 3000);
+    // Auto remove after 3 seconds (slightly longer for info toasts)
+    const duration = type === 'info' ? 2000 : 3000;
+    setTimeout(() => toast.remove(), duration);
 }
 
 // =============================================================================
@@ -1269,6 +1445,352 @@ async function updateImportButtonState() {
         importBtn.title = 'Start League of Legends client to enable import';
         importBtn.classList.add('btn-disabled');
     }
+}
+
+// =============================================================================
+// AUTO-IMPORT FUNCTIONALITY
+// =============================================================================
+
+/**
+ * Toggle auto-import feature on/off.
+ * When enabled, monitors Live Client Data for champion picks and auto-imports builds.
+ *
+ * ## Riot Games Compliance
+ * - Uses official Live Client Data API (https://developer.riotgames.com/docs/lol#game-client-api)
+ * - Only reads data, no synthetic inputs
+ * - User must explicitly enable this feature (opt-in)
+ * - Can be disabled at any time
+ *
+ * @param {boolean} enabled - Whether to enable auto-import
+ */
+function toggleAutoImport(enabled) {
+    autoImportEnabled = enabled;
+    console.log(`[AutoImport] ${enabled ? 'Enabled' : 'Disabled'}`);
+
+    // Save preference to localStorage
+    localStorage.setItem('focusapp_autoimport', enabled ? 'true' : 'false');
+
+    // Update UI toggle state
+    const toggle = document.getElementById('auto-import-toggle');
+    if (toggle) {
+        toggle.checked = enabled;
+    }
+
+    const statusEl = document.getElementById('auto-import-status');
+    if (statusEl) {
+        statusEl.textContent = enabled ? 'ON' : 'OFF';
+        statusEl.className = `auto-import-status ${enabled ? 'status-on' : 'status-off'}`;
+    }
+
+    if (enabled) {
+        startAutoImportListener();
+    } else {
+        stopAutoImportListener();
+    }
+}
+
+/**
+ * Start polling Live Client Data for champion select detection.
+ * Polls every 2 seconds to detect when user picks a champion.
+ */
+function startAutoImportListener() {
+    if (autoImportPollInterval) {
+        clearInterval(autoImportPollInterval);
+    }
+
+    console.log('[AutoImport] Starting Live Client Data listener...');
+
+    // Reset state
+    lastAutoImportedChampion = null;
+    inChampionSelect = false;
+
+    autoImportPollInterval = setInterval(async () => {
+        try {
+            await checkChampionSelectAndImport();
+        } catch (error) {
+            // Silently fail - client may not be in game/champ select
+            console.debug('[AutoImport] Poll cycle:', error.message);
+        }
+    }, 2000);
+}
+
+/**
+ * Stop the auto-import listener.
+ */
+function stopAutoImportListener() {
+    if (autoImportPollInterval) {
+        clearInterval(autoImportPollInterval);
+        autoImportPollInterval = null;
+    }
+    lastAutoImportedChampion = null;
+    inChampionSelect = false;
+    console.log('[AutoImport] Listener stopped');
+}
+
+/**
+ * Check champion select state and auto-import if a new champion is picked.
+ * Uses LCU API to detect champion select phase and picked champion.
+ */
+async function checkChampionSelectAndImport() {
+    if (!window.__TAURI__ || !window.__TAURI__.core) {
+        return;
+    }
+
+    try {
+        // Try to get champion select session from LCU
+        const session = await window.__TAURI__.core.invoke('get_champion_select_session_cmd');
+
+        if (!session || !session.localPlayerCellId) {
+            // Not in champion select
+            if (inChampionSelect) {
+                console.log('[AutoImport] Left champion select');
+                inChampionSelect = false;
+                lastAutoImportedChampion = null;
+            }
+            return;
+        }
+
+        inChampionSelect = true;
+
+        // Find local player's pick
+        const myActions = session.actions?.flat()?.filter(
+            (a) => a.actorCellId === session.localPlayerCellId && a.type === 'pick'
+        ) || [];
+
+        const myPick = myActions.find((a) => a.championId && a.championId > 0 && a.completed);
+
+        if (!myPick) {
+            // No champion picked yet
+            return;
+        }
+
+        const championId = myPick.championId;
+
+        // Check if we already imported for this champion
+        if (lastAutoImportedChampion === championId) {
+            return;
+        }
+
+        console.log(`[AutoImport] Champion picked: ${championId}`);
+
+        // Detect role from assigned position
+        let role = 'mid'; // Default fallback
+        const myTeam = session.myTeam || [];
+        const myCell = myTeam.find((p) => p.cellId === session.localPlayerCellId);
+        if (myCell && myCell.assignedPosition) {
+            role = normalizeRole(myCell.assignedPosition);
+        }
+
+        // Get champion name from ID
+        const championName = await getChampionNameFromId(championId);
+        if (!championName) {
+            console.warn(`[AutoImport] Unknown champion ID: ${championId}`);
+            return;
+        }
+
+        // Mark as imported to prevent duplicates
+        lastAutoImportedChampion = championId;
+
+        // Auto-import the build
+        await autoImportBuild(championName, role);
+
+    } catch (error) {
+        // Not in champion select or LCU not available
+        if (inChampionSelect) {
+            inChampionSelect = false;
+            lastAutoImportedChampion = null;
+        }
+    }
+}
+
+/**
+ * Normalize LCU position to role name.
+ * @param {string} position - LCU position (e.g., "UTILITY", "BOTTOM")
+ * @returns {string} Normalized role name
+ */
+function normalizeRole(position) {
+    const roleMap = {
+        'TOP': 'top',
+        'JUNGLE': 'jungle',
+        'MIDDLE': 'mid',
+        'BOTTOM': 'adc',
+        'UTILITY': 'support',
+        'FILL': 'mid',
+        '': 'mid'
+    };
+    return roleMap[position?.toUpperCase()] || 'mid';
+}
+
+/**
+ * Normalize tier list role display to build role selector value.
+ * @param {string} role - Role from tier list (e.g., "Top", "Mid", "ADC", "Support")
+ * @returns {string} Normalized role for build selector
+ */
+function normalizeRoleForBuild(role) {
+    const roleMap = {
+        'top': 'top',
+        'jungle': 'jungle',
+        'mid': 'mid',
+        'middle': 'mid',
+        'adc': 'adc',
+        'bottom': 'adc',
+        'support': 'support',
+        'utility': 'support'
+    };
+    return roleMap[role?.toLowerCase()] || 'mid';
+}
+
+/**
+ * Navigate to builds tab and load a specific champion's build.
+ * Called when clicking a champion row in the tier list.
+ * @param {string} championName - Champion name
+ * @param {string} role - Role for the build (top, jungle, mid, adc, support)
+ */
+async function navigateToBuildForChampion(championName, role) {
+    console.log(`[Navigation] Loading build for ${championName} (${role})`);
+
+    // Switch to builds tab
+    switchTab('builds');
+
+    // Show feedback toast
+    showToast(`Loading ${championName} ${role.toUpperCase()} build...`, 'info');
+
+    // Load champion grid if not already loaded
+    if (buildChampions.length === 0) {
+        await loadChampionGrid();
+    }
+
+    // Find champion in build champions list
+    const champion = buildChampions.find(c =>
+        c.name.toLowerCase() === championName.toLowerCase() ||
+        c.id.toLowerCase() === championName.toLowerCase()
+    );
+
+    if (champion) {
+        // Set role selector
+        const roleSelect = document.getElementById('role-select');
+        if (roleSelect) {
+            roleSelect.value = role;
+        }
+
+        // Select champion and load build
+        await selectChampion(champion.id, champion.name);
+    } else {
+        // Fallback: try to load build directly by name
+        const roleSelect = document.getElementById('role-select');
+        if (roleSelect) {
+            roleSelect.value = role;
+        }
+
+        const searchInput = document.getElementById('champion-search');
+        if (searchInput) {
+            searchInput.value = championName;
+            // Update clear button visibility
+            const wrapper = searchInput.closest('.search-input-wrapper');
+            if (wrapper) {
+                wrapper.classList.add('has-value');
+            }
+        }
+
+        selectedChampionName = championName;
+        await loadChampionBuild(championName);
+    }
+}
+
+/**
+ * Get champion name from champion ID using cached champion list.
+ * @param {number} championId - Champion ID
+ * @returns {Promise<string|null>} Champion name or null
+ */
+async function getChampionNameFromId(championId) {
+    // Use buildChampions cache if available
+    if (buildChampions.length > 0) {
+        const champ = buildChampions.find((c) => parseInt(c.key) === championId);
+        if (champ) return champ.id; // Return the normalized ID (e.g., "LeeSin")
+    }
+
+    // Fallback: fetch champion list
+    const { getChampionList } = await import('./api.js');
+    const champions = await getChampionList();
+    const champ = champions.find((c) => parseInt(c.key) === championId);
+    return champ ? champ.id : null;
+}
+
+/**
+ * Auto-import a build for a champion.
+ * Fetches the build and imports runes + items to the client.
+ *
+ * @param {string} championName - Champion name (e.g., "Sion", "LeeSin")
+ * @param {string} role - Role (e.g., "top", "jungle")
+ */
+async function autoImportBuild(championName, role) {
+    console.log(`[AutoImport] Importing build for ${championName} ${role}...`);
+
+    try {
+        // Fetch build from API
+        const { getChampionBuild } = await import('./api.js');
+        const build = await getChampionBuild(championName, role);
+
+        if (!build || !build.success) {
+            console.warn(`[AutoImport] No build found for ${championName} ${role}`);
+            showToast(`No build data for ${championName}`, 'warning');
+            return;
+        }
+
+        // Store as current build for reference
+        currentBuild = build;
+        selectedChampionName = championName;
+
+        // Build import payload
+        const payload = buildImportPayload(build);
+
+        // Import to client
+        const result = await window.__TAURI__.core.invoke('import_build_to_client', {
+            payload: payload
+        });
+
+        if (result.success) {
+            const roleDisplay = role.charAt(0).toUpperCase() + role.slice(1);
+            showToast(`✓ ${championName} ${roleDisplay} build imported!`, 'success');
+            console.log(`[AutoImport] Success: ${championName} ${role}`);
+        } else {
+            showToast(`Import failed: ${result.message}`, 'error');
+        }
+
+    } catch (error) {
+        console.error('[AutoImport] Error:', error);
+        showToast(`Auto-import failed: ${error.message}`, 'error');
+    }
+}
+
+/**
+ * Initialize auto-import from saved preference.
+ */
+function initAutoImport() {
+    const saved = localStorage.getItem('focusapp_autoimport');
+    const enabled = saved === 'true';
+
+    // Set initial state without triggering listener yet
+    autoImportEnabled = enabled;
+
+    // Update toggle UI if it exists
+    const toggle = document.getElementById('auto-import-toggle');
+    if (toggle) {
+        toggle.checked = enabled;
+    }
+
+    const statusEl = document.getElementById('auto-import-status');
+    if (statusEl) {
+        statusEl.textContent = enabled ? 'ON' : 'OFF';
+        statusEl.className = `auto-import-status ${enabled ? 'status-on' : 'status-off'}`;
+    }
+
+    // Start listener if enabled
+    if (enabled) {
+        startAutoImportListener();
+    }
+
+    console.log(`[AutoImport] Initialized, enabled: ${enabled}`);
 }
 
 /**
@@ -1573,6 +2095,14 @@ function renderBuild(build) {
                 <button id="import-build-btn" class="btn btn-import" onclick="importBuildToClient()" title="Import runes and item set to League Client">
                     <i class="fas fa-download"></i> Import to LoL
                 </button>
+                <div class="auto-import-container">
+                    <label class="auto-import-label" title="Automatically import builds when you pick a champion in champ select">
+                        <input type="checkbox" id="auto-import-toggle" onchange="toggleAutoImport(this.checked)">
+                        <span class="toggle-slider"></span>
+                        <span class="toggle-text">Auto-import</span>
+                    </label>
+                    <span id="auto-import-status" class="auto-import-status status-off">OFF</span>
+                </div>
             </div>
         </div>
 
@@ -1611,6 +2141,14 @@ window.filterItems = filterItems;
 window.retryBackendConnection = retryBackendConnection;
 window.importBuildToClient = importBuildToClient;
 window.updateImportButtonState = updateImportButtonState;
+window.toggleAutoImport = toggleAutoImport;
+window.initAutoImport = initAutoImport;
+window.selectChampion = selectChampion;
+window.loadChampionGrid = loadChampionGrid;
+window.updateChampionGrid = updateChampionGrid;
+window.updateSortIndicators = updateSortIndicators;
+window.navigateToBuildForChampion = navigateToBuildForChampion;
+window.normalizeRoleForBuild = normalizeRoleForBuild;
 
 // =============================================================================
 // EVENT LISTENERS (Alternative aux onclick inline)
@@ -1621,6 +2159,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize app
     init();
+
+    // Initialize auto-import feature (respects saved user preference)
+    initAutoImport();
 
     // Periodically check League Client status to update import button
     // Check every 5 seconds to keep button state accurate
@@ -1678,17 +2219,168 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     console.log(`✅ ${tableHeaders.length} table headers attached`);
 
-    // ✅ CHAMPION SELECT (builds tab)
-    const championSelect = document.getElementById('champion-select');
-    if (championSelect) {
-        championSelect.addEventListener('change', loadChampionBuild);
-        console.log('✅ Champion select attached');
+    // ✅ CHAMPION SEARCH (builds tab - new grid system)
+    const championSearch = document.getElementById('champion-search');
+    const championGrid = document.getElementById('champion-grid');
+    if (championSearch && championGrid) {
+        // Live search filtering
+        championSearch.addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+
+            // Use buildChampions (separate from tierlist data)
+            if (query.length === 0) {
+                filteredChampionsBuild = [...buildChampions];
+            } else {
+                filteredChampionsBuild = buildChampions.filter(c =>
+                    c.name.toLowerCase().includes(query) ||
+                    c.id.toLowerCase().includes(query)
+                );
+            }
+
+            updateChampionGrid();
+
+            // Show grid when typing
+            if (buildChampions.length > 0) {
+                championGrid.classList.add('visible');
+            }
+        });
+
+        // Show grid on focus (load champions if needed)
+        championSearch.addEventListener('focus', async () => {
+            if (buildChampions.length === 0 && !championListLoaded) {
+                await loadChampionGrid();
+            }
+            if (buildChampions.length > 0) {
+                filteredChampionsBuild = [...buildChampions];
+                updateChampionGrid();
+                championGrid.classList.add('visible');
+            }
+        });
+
+        // Hide grid when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.querySelector('.champion-search-container');
+            if (container && !container.contains(e.target)) {
+                championGrid.classList.remove('visible');
+            }
+        });
+
+        // Keyboard navigation for champion grid
+        let highlightedIndex = -1;
+
+        function updateHighlight(newIndex) {
+            const buttons = championGrid.querySelectorAll('.champ-btn');
+            if (buttons.length === 0) return;
+
+            // Remove previous highlight
+            buttons.forEach(btn => btn.classList.remove('keyboard-highlight'));
+
+            // Clamp index
+            if (newIndex < 0) newIndex = 0;
+            if (newIndex >= buttons.length) newIndex = buttons.length - 1;
+
+            highlightedIndex = newIndex;
+            const highlightedBtn = buttons[highlightedIndex];
+            if (highlightedBtn) {
+                highlightedBtn.classList.add('keyboard-highlight');
+                highlightedBtn.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        championSearch.addEventListener('keydown', (e) => {
+            const buttons = championGrid.querySelectorAll('.champ-btn');
+            const gridVisible = championGrid.classList.contains('visible');
+            const cols = Math.floor(championGrid.offsetWidth / 58) || 6; // Approximate columns
+
+            if (e.key === 'ArrowDown' && gridVisible) {
+                e.preventDefault();
+                updateHighlight(highlightedIndex + cols);
+            } else if (e.key === 'ArrowUp' && gridVisible) {
+                e.preventDefault();
+                updateHighlight(highlightedIndex - cols);
+            } else if (e.key === 'ArrowRight' && gridVisible) {
+                e.preventDefault();
+                updateHighlight(highlightedIndex + 1);
+            } else if (e.key === 'ArrowLeft' && gridVisible) {
+                e.preventDefault();
+                updateHighlight(highlightedIndex - 1);
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                if (highlightedIndex >= 0 && buttons[highlightedIndex]) {
+                    const btn = buttons[highlightedIndex];
+                    selectChampion(btn.dataset.id, btn.dataset.name);
+                } else if (filteredChampionsBuild.length > 0) {
+                    const firstChamp = filteredChampionsBuild[0];
+                    selectChampion(firstChamp.id, firstChamp.name);
+                }
+                highlightedIndex = -1;
+            } else if (e.key === 'Escape') {
+                championGrid.classList.remove('visible');
+                championSearch.blur();
+                highlightedIndex = -1;
+            }
+        });
+
+        // Reset highlight when input changes
+        championSearch.addEventListener('input', () => {
+            highlightedIndex = -1;
+            // Update clear button visibility
+            const wrapper = championSearch.closest('.search-input-wrapper');
+            if (wrapper) {
+                wrapper.classList.toggle('has-value', championSearch.value.length > 0);
+            }
+        });
+
+        // Clear button functionality
+        const clearBtn = document.getElementById('champion-search-clear');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                championSearch.value = '';
+                selectedChampion = null;
+                selectedChampionName = null;
+                filteredChampionsBuild = [...buildChampions];
+                updateChampionGrid();
+                championSearch.focus();
+
+                // Update wrapper state
+                const wrapper = championSearch.closest('.search-input-wrapper');
+                if (wrapper) {
+                    wrapper.classList.remove('has-value');
+                }
+
+                // Clear build display
+                const container = document.getElementById('build-container');
+                if (container) {
+                    container.innerHTML = `
+                        <div class="build-placeholder">
+                            <i class="fas fa-hammer"></i>
+                            <p>Selectionnez un champion pour voir son build</p>
+                        </div>
+                    `;
+                }
+
+                // Clear cache/quality indicators
+                const cacheInfo = document.getElementById('build-cache-info');
+                const qualityIndicator = document.getElementById('build-quality-indicator');
+                if (cacheInfo) cacheInfo.innerHTML = '';
+                if (qualityIndicator) qualityIndicator.innerHTML = '';
+            });
+        }
+
+        console.log('✅ Champion search grid attached');
     }
 
     // ✅ ROLE SELECT (builds tab)
     const roleSelect = document.getElementById('role-select');
     if (roleSelect) {
-        roleSelect.addEventListener('change', loadChampionBuild);
+        roleSelect.addEventListener('change', () => {
+            // Only reload if a champion is selected
+            if (selectedChampionName) {
+                loadChampionBuild(selectedChampionName);
+            }
+        });
         console.log('✅ Role select attached');
     }
 

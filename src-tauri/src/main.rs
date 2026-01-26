@@ -26,10 +26,12 @@
     windows_subsystem = "windows"
 )]
 
+mod champions;
 mod lcu;
 
 use lcu::{
-    add_item_set, create_rune_page, find_lockfile, ImportPayloadResponse, ImportResult, LcuError,
+    add_item_set, create_rune_page, find_lockfile, get_champion_select_session,
+    ChampionSelectSession, ImportPayloadResponse, ImportResult, LcuError,
 };
 use serde::{Deserialize, Serialize};
 use std::panic;
@@ -245,6 +247,28 @@ async fn is_league_client_running() -> bool {
     find_lockfile().await.is_ok()
 }
 
+/// Get the current champion select session.
+///
+/// # Compliance Note
+///
+/// This command is designed to comply with Riot Games' third-party application policy:
+/// - It ONLY reads data from the official League Client API (no writes)
+/// - It is used for opt-in auto-import feature that users must explicitly enable
+/// - The same information is visible in the game client UI
+/// - It does NOT provide any competitive advantage
+///
+/// # Returns
+///
+/// * `Ok(ChampionSelectSession)` - The current champion select session
+/// * `Err(CommandError)` - Not in champion select or client not running
+#[tauri::command]
+async fn get_champion_select_session_cmd() -> Result<ChampionSelectSession, CommandError> {
+    let connection = find_lockfile().await.map_err(CommandError::from)?;
+    get_champion_select_session(&connection)
+        .await
+        .map_err(CommandError::from)
+}
+
 /// Initialize the application with proper error handling.
 /// This function runs before Tauri starts to catch early errors.
 fn initialize_app() -> Result<(), Box<dyn std::error::Error>> {
@@ -301,7 +325,8 @@ fn main() {
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
             import_build_to_client,
-            is_league_client_running
+            is_league_client_running,
+            get_champion_select_session_cmd
         ])
         .setup(|_app| {
             #[cfg(debug_assertions)]

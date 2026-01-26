@@ -88,6 +88,10 @@
                     <!-- ✅ Plus de onkeyup -->
                     <input type="text" id="search-input" placeholder="Chercher un champion...">
                 </div>
+
+                <div class="control-group hint-group">
+                    <span class="click-hint"><i class="fas fa-mouse-pointer"></i> Cliquez sur un champion pour voir son build</span>
+                </div>
             </div>
 
             <main>
@@ -121,19 +125,23 @@
         <!-- BUILDS TAB -->
         <div id="builds-tab" class="tab-content">
             <div class="controls-bar">
-                <div class="control-group">
-                    <label for="champion-select"><i class="fas fa-user"></i> Champion</label>
-                    <!-- ✅ Plus de onchange -->
-                    <select id="champion-select">
-                        <option value="">-- Selectionner --</option>
-                    </select>
+                <div class="control-group champion-search-control">
+                    <label for="champion-search"><i class="fas fa-user"></i> Champion</label>
+                    <div class="champion-search-container">
+                        <div class="search-input-wrapper">
+                            <input type="text" id="champion-search" placeholder="Recherche champion..." class="search-input" autocomplete="off" spellcheck="false">
+                            <button id="champion-search-clear" class="search-clear-btn" type="button" title="Effacer">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div id="champion-grid" class="champion-grid"></div>
+                    </div>
                 </div>
 
                 <div class="control-separator"></div>
 
                 <div class="control-group">
                     <label for="role-select"><i class="fas fa-map"></i> Role</label>
-                    <!-- ✅ Plus de onchange -->
                     <select id="role-select">
                         <option value="top">Top</option>
                         <option value="jungle">Jungle</option>

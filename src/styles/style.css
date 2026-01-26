@@ -296,6 +296,17 @@ thead th i {
   margin-left: 5px;
   opacity: 0.5;
   font-size: 0.8em;
+  transition: all 0.2s ease;
+}
+
+thead th.sorted {
+  background: rgba(249, 226, 175, 0.1);
+  color: var(--accent-color);
+}
+
+thead th.sorted i {
+  opacity: 1;
+  color: var(--accent-color);
 }
 
 tbody tr {
@@ -671,11 +682,13 @@ tbody tr:last-child td {
   color: var(--danger-color);
 }
 
-/* Build Actions (Import Button) */
+/* Build Actions (Import Button + Auto-Import Toggle) */
 .build-actions {
   margin-left: auto;
   display: flex;
   align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
 .btn-import {
@@ -719,6 +732,83 @@ tbody tr:last-child td {
 
 .btn-import i {
   font-size: 1rem;
+}
+
+/* Auto-Import Toggle */
+.auto-import-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--glass-bg);
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+}
+
+.auto-import-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-import-label input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.auto-import-label input:checked + .toggle-slider {
+  background: var(--accent-color);
+}
+
+.auto-import-label input:checked + .toggle-slider::after {
+  transform: translateX(16px);
+  background: var(--bg-primary);
+}
+
+.toggle-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.auto-import-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.auto-import-status.status-on {
+  background: rgba(166, 227, 161, 0.2);
+  color: var(--success-color);
+}
+
+.auto-import-status.status-off {
+  background: rgba(108, 112, 134, 0.2);
+  color: var(--text-secondary);
 }
 
 .build-sections {
@@ -2531,6 +2621,12 @@ tbody tr:last-child td {
     border: 1px solid rgba(137, 180, 250, 0.8);
 }
 
+.toast-warning {
+    background: linear-gradient(135deg, rgba(249, 226, 175, 0.95), rgba(249, 226, 175, 0.85));
+    color: #1e1e2e;
+    border: 1px solid rgba(249, 226, 175, 0.8);
+}
+
 /* =============================================================================
    ITEMS FILTERS - UNE SEULE LIGNE
    ============================================================================= */
@@ -2728,5 +2824,538 @@ tbody tr:last-child td {
 
 .quality-indicator i {
     font-size: 0.75rem;
+}
+
+/* =============================================================================
+   CHAMPION SEARCH GRID (Builds Tab)
+   ============================================================================= */
+
+.champion-search-control {
+    position: relative;
+    flex: 1;
+    max-width: 400px;
+}
+
+.champion-search-container {
+    position: relative;
+}
+
+.champion-search-container .search-input {
+    width: 100%;
+    min-width: 200px;
+}
+
+/* Search input wrapper with clear button */
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-input-wrapper .search-input {
+    padding-right: 36px;
+}
+
+.search-clear-btn {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: rgba(205, 214, 244, 0.1);
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 10px;
+    opacity: 0;
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.search-input-wrapper:hover .search-clear-btn,
+.search-input-wrapper .search-input:focus + .search-clear-btn {
+    opacity: 0.6;
+    pointer-events: auto;
+}
+
+.search-clear-btn:hover {
+    opacity: 1 !important;
+    background: rgba(243, 139, 168, 0.2);
+    color: var(--danger-color);
+}
+
+/* Show clear button when input has value */
+.search-input-wrapper.has-value .search-clear-btn {
+    opacity: 0.6;
+    pointer-events: auto;
+}
+
+.champion-grid {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    grid-template-columns: repeat(auto-fill, 56px);
+    gap: 6px;
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 12px;
+    background: rgba(17, 17, 27, 0.98);
+    backdrop-filter: blur(16px);
+    border-radius: 12px;
+    border: 1px solid rgba(249, 226, 175, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    margin-top: 8px;
+}
+
+.champion-grid.visible {
+    display: grid;
+}
+
+.champ-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    border: 2px solid rgba(205, 214, 244, 0.1);
+    background: rgba(30, 30, 46, 0.6);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    padding: 0;
+}
+
+.champ-btn:hover {
+    background: rgba(249, 226, 175, 0.1);
+    border-color: rgba(249, 226, 175, 0.4);
+    transform: scale(1.08);
+}
+
+.champ-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 6px;
+}
+
+.champ-btn.active {
+    border: 2px solid var(--accent-color);
+    box-shadow: 0 0 12px rgba(249, 226, 175, 0.4);
+}
+
+.champ-btn.active::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(249, 226, 175, 0.15);
+    pointer-events: none;
+}
+
+.champ-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0, 0, 0, 0.85);
+    font-size: 9px;
+    text-align: center;
+    padding: 2px 1px;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 24px;
+    font-size: 0.9rem;
+}
+
+.search-empty i {
+    display: block;
+    font-size: 2rem;
+    margin-bottom: 8px;
+    opacity: 0.5;
+}
+
+/* Hide grid when input is empty and not focused */
+.champion-search-container:not(.has-results) .champion-grid {
+    display: none;
+}
+
+/* =============================================================================
+   UX POLISH - CLICKABLE TIER LIST ROWS & ENHANCED INTERACTIONS
+   ============================================================================= */
+
+/* Clickable champion rows in tier list */
+.champion-row.clickable {
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.champion-row.clickable::after {
+    content: '';
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    opacity: 0;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f9e2af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14m-7-7 7 7-7 7'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.champion-row.clickable:hover {
+    background: rgba(249, 226, 175, 0.08);
+}
+
+.champion-row.clickable:hover::after {
+    opacity: 0.6;
+    transform: translateY(-50%) translateX(4px);
+}
+
+.champion-row.clickable:active {
+    background: rgba(249, 226, 175, 0.12);
+}
+
+.champion-row.clickable td:first-child {
+    position: relative;
+}
+
+/* Visual hint on champion name */
+.champion-row.clickable td:nth-child(2) strong {
+    transition: color 0.2s ease;
+}
+
+.champion-row.clickable:hover td:nth-child(2) strong {
+    color: var(--accent-color);
+}
+
+/* =============================================================================
+   ENHANCED FOCUS STATES (Accessibility)
+   ============================================================================= */
+
+/* Global focus outline for keyboard navigation */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+.tab-btn:focus-visible,
+.role-filter-btn-small:focus-visible,
+.champ-btn:focus-visible,
+.pagination-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+}
+
+/* Remove default focus outlines when using mouse */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* Enhanced input focus states */
+input:focus,
+select:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(249, 226, 175, 0.15), 0 0 12px rgba(249, 226, 175, 0.1);
+}
+
+/* =============================================================================
+   ENHANCED BUTTON HOVER STATES
+   ============================================================================= */
+
+/* Tab buttons enhanced hover */
+.tab-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.tab-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(249, 226, 175, 0.1), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.tab-btn:hover::before {
+    opacity: 1;
+}
+
+.tab-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.tab-btn:active {
+    transform: translateY(0);
+}
+
+/* Role filter buttons enhanced hover */
+.role-filter-btn-small {
+    position: relative;
+    overflow: hidden;
+}
+
+.role-filter-btn-small::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(249, 226, 175, 0.2), transparent);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.role-filter-btn-small:hover::before {
+    opacity: 1;
+}
+
+/* =============================================================================
+   IMPROVED TABLE HEADER INTERACTIONS
+   ============================================================================= */
+
+thead th[data-sort] {
+    position: relative;
+    user-select: none;
+    transition: all 0.2s ease;
+}
+
+thead th[data-sort]:hover {
+    background: rgba(249, 226, 175, 0.08);
+    color: var(--accent-color);
+}
+
+thead th[data-sort]:hover i {
+    opacity: 1;
+    color: var(--accent-color);
+}
+
+thead th[data-sort]:active {
+    background: rgba(249, 226, 175, 0.12);
+}
+
+/* =============================================================================
+   IMPROVED CHAMPION SEARCH AUTOCOMPLETE
+   ============================================================================= */
+
+/* Search input with better visual feedback */
+#champion-search {
+    transition: all 0.2s ease;
+}
+
+#champion-search:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 3px rgba(249, 226, 175, 0.15);
+}
+
+/* Champion grid dropdown enhancements */
+.champion-grid {
+    animation: dropdownFadeIn 0.2s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Champion button keyboard navigation */
+.champ-btn:focus-visible {
+    outline: 2px solid var(--accent-color);
+    outline-offset: 2px;
+    z-index: 1;
+}
+
+/* Active/selected champion button enhancement */
+.champ-btn.active {
+    animation: selectPulse 0.3s ease-out;
+}
+
+@keyframes selectPulse {
+    0% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Keyboard navigation highlight */
+.champ-btn.keyboard-highlight {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px var(--accent-color), 0 0 12px rgba(249, 226, 175, 0.4);
+    transform: scale(1.05);
+    z-index: 10;
+}
+
+/* =============================================================================
+   IMPROVED CARD & SECTION INTERACTIONS
+   ============================================================================= */
+
+/* Build sections hover effect */
+.build-section {
+    transition: all 0.2s ease;
+}
+
+.build-section:hover {
+    border-color: rgba(249, 226, 175, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Item cards enhanced hover */
+.item-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.item-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.05), transparent);
+    transition: left 0.5s ease;
+}
+
+.item-card:hover::before {
+    left: 100%;
+}
+
+/* =============================================================================
+   LOADING STATES POLISH
+   ============================================================================= */
+
+/* Smooth loading cell */
+.loading-cell {
+    animation: pulse-soft 2s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+    0%, 100% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+    }
+}
+
+/* =============================================================================
+   MICRO-INTERACTIONS
+   ============================================================================= */
+
+/* Smooth transitions for all interactive elements */
+button,
+input,
+select,
+a,
+.clickable {
+    transition: all 0.2s ease;
+}
+
+/* Subtle scale on click for buttons */
+.btn-refresh:active,
+.btn-import:active:not(:disabled),
+.btn-refresh-small:active:not(:disabled),
+.retry-btn:active {
+    transform: scale(0.98);
+}
+
+/* Pagination buttons smooth hover */
+.pagination-btn:not(:disabled):hover {
+    transform: translateY(-1px);
+}
+
+/* Toast notification improvements */
+.toast-notification {
+    backdrop-filter: blur(8px);
+}
+
+/* =============================================================================
+   VISUAL CONSISTENCY IMPROVEMENTS
+   ============================================================================= */
+
+/* Consistent border radius */
+.controls-bar,
+.card,
+.build-header,
+.build-section {
+    border-radius: 16px;
+}
+
+/* Consistent spacing in controls bar */
+.controls-bar {
+    gap: 12px;
+}
+
+.control-separator {
+    margin: 0 4px;
+}
+
+/* Ensure consistent text truncation */
+.item-name,
+.champ-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Click hint in tier list */
+.hint-group {
+    flex-shrink: 0;
+}
+
+.click-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    opacity: 0.7;
+    padding: 6px 10px;
+    background: rgba(205, 214, 244, 0.05);
+    border-radius: 6px;
+    transition: opacity 0.2s ease;
+}
+
+.click-hint:hover {
+    opacity: 1;
+}
+
+.click-hint i {
+    color: var(--accent-color);
+    font-size: 0.7rem;
+}
+
+/* Hide click hint on small screens */
+@media (max-width: 900px) {
+    .hint-group {
+        display: none;
+    }
 }
 

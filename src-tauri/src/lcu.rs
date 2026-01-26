@@ -479,6 +479,93 @@ pub async fn add_item_set(
     update_item_sets(connection, summoner_id, &sets_response).await
 }
 
+// =============================================================================
+// CHAMPION SELECT DETECTION
+// =============================================================================
+
+/// Champion select session data from LCU
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChampionSelectSession {
+    /// Local player's cell ID
+    pub local_player_cell_id: Option<i64>,
+    /// All actions in champion select (picks, bans, etc.)
+    pub actions: Option<Vec<Vec<ChampSelectAction>>>,
+    /// Team information
+    pub my_team: Option<Vec<ChampSelectTeamMember>>,
+    /// Game ID
+    pub game_id: Option<i64>,
+    /// Is spectating
+    #[serde(default)]
+    pub is_spectating: bool,
+}
+
+/// An action in champion select (pick or ban)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChampSelectAction {
+    /// Actor cell ID
+    pub actor_cell_id: i64,
+    /// Champion ID (0 if not selected)
+    pub champion_id: i64,
+    /// Action completed
+    pub completed: bool,
+    /// Action ID
+    pub id: i64,
+    /// Action type ("pick" or "ban")
+    #[serde(rename = "type")]
+    pub action_type: String,
+}
+
+/// Team member in champion select
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChampSelectTeamMember {
+    /// Cell ID
+    pub cell_id: i64,
+    /// Champion ID
+    pub champion_id: i64,
+    /// Assigned position (e.g., "TOP", "JUNGLE", "MIDDLE", "BOTTOM", "UTILITY")
+    pub assigned_position: Option<String>,
+    /// Summoner ID
+    pub summoner_id: Option<i64>,
+}
+
+/// Get the current champion select session from the League Client.
+///
+/// This is used for auto-import functionality to detect when a player picks a champion.
+///
+/// # Compliance Note
+/// - Uses official LCU endpoint /lol-champ-select/v1/session
+/// - Read-only operation, does not modify game state
+/// - Used for quality-of-life auto-import feature (user opt-in)
+pub async fn get_champion_select_session(
+    connection: &LcuConnection,
+) -> Result<ChampionSelectSession, LcuError> {
+    let client = create_lcu_client()?;
+    let url = format!(
+        "{}/lol-champ-select/v1/session",
+        connection.base_url()
+    );
+
+    let response = client
+        .get(&url)
+        .header("Authorization", connection.auth_header())
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(LcuError::ApiError(format!(
+            "Not in champion select or error: {} - {}",
+            status, body
+        )));
+    }
+
+    response.json().await.map_err(LcuError::HttpError)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -254,13 +254,14 @@ function formatTierlistResponse(data, filteredRole = null) {
       formattedTiers[tier].push(formattedEntry);
 
       // Add to flat list for table display
+      // Store raw numeric values - formatWinrate/formatPickrate in main.js will format them
       flatList.push({
         rank: String(rankCounter),
         name: formattedEntry.name,
         role: displayRole,
         tier: tier,
-        winrate: winrateStr,
-        pickrate: pickrateStr,
+        winrate: winrate,     // Raw decimal (0.533 = 53.3%)
+        pickrate: pickrate,   // Raw decimal (0.015 = 1.5%)
         games: champ.games_analyzed || 0,
       });
       rankCounter++;
@@ -468,32 +469,34 @@ function formatBuildResponse(data, champion, role) {
     };
   };
 
-  // Starting items (use common starting items logic or first slot's cheaper items)
+  // Starting items - Get top 2 most popular items from "first" slot
+  // Sorted by count (most picked) then winrate as tiebreaker
   const startingItems = [];
   const firstSlot = itemsArray.find((s) => s.slot === "first");
-  if (firstSlot && firstSlot.items) {
-    // Filter for likely starting items (typically < 500 gold or common starters like Doran's)
-    const starters = firstSlot.items.filter((i) => starterIds.includes(i.id));
-    if (starters.length > 0) {
-      const bestStarter = starters.reduce(
-        (best, curr) => (curr.count > (best?.count || 0) ? curr : best),
-        null,
-      );
-      if (bestStarter) {
-        startingItems.push(formatItem(bestStarter));
-      }
+  if (firstSlot && firstSlot.items && firstSlot.items.length > 0) {
+    // Sort by count desc, then winrate desc as tiebreaker
+    const sortedFirstItems = [...firstSlot.items].sort((a, b) => {
+      if (b.count !== a.count) return b.count - a.count;
+      return (b.winrate || 0) - (a.winrate || 0);
+    });
+
+    // Take top 2 items as starting items (regardless of whether they're "traditional" starters)
+    // This handles cases like Sion buying Titanic Hydra components first
+    for (const item of sortedFirstItems.slice(0, 2)) {
+      startingItems.push(formatItem(item));
     }
   }
 
-  // Core items (first 3 completed items from slots, excluding boots and starters)
+  // Core items (first 3 completed items from slots, excluding boots and starting items)
   const coreItems = [];
+  const startingItemIds = new Set(startingItems.map((i) => i.id));
 
   for (const slotName of ["first", "second", "third"]) {
     const bestItem = getBestItemFromSlot(slotName);
     if (
       bestItem &&
       !bootIds.includes(bestItem.id) &&
-      !starterIds.includes(bestItem.id)
+      !startingItemIds.has(bestItem.id)
     ) {
       coreItems.push(formatItem(bestItem));
     }
@@ -519,10 +522,11 @@ function formatBuildResponse(data, champion, role) {
     }
   }
 
-  // Situational items (other popular items not in core)
+  // Situational items (other popular items not in core/starting)
   const situationalItems = [];
   const usedIds = new Set(
     [
+      ...startingItems.map((i) => i?.id),
       ...coreItems.map((i) => i?.id),
       ...fullBuildItems.map((i) => i?.id),
       boots?.id,
@@ -1220,5 +1224,5 @@ function getSpellName(spellId) {
  * Get application version.
  */
 export function getAppVersion() {
-  return "1.2.2";
+  return "1.4.0";
 }
