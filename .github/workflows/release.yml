@@ -10,6 +10,8 @@ jobs:
   build-and-release:
     permissions:
       contents: write
+      issues: read
+      pull-requests: read
     runs-on: windows-latest
 
     steps:
@@ -20,12 +22,11 @@ jobs:
 
       - name: Generate changelog
         id: changelog
-        uses: janheinrichmerker/action-github-changelog-generator@v2.4
+        uses: mikepenz/release-changelog-builder-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          sinceTag: ${{ github.ref_name }}
-          compareLink: true
-          simpleList: true  # Liste simple comme votre script original
+          fromTag: ${{ github.ref_name }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
