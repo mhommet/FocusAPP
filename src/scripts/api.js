@@ -267,8 +267,8 @@ function formatTierlistResponse(data, filteredRole = null) {
         name: formattedEntry.name,
         role: displayRole,
         tier: tier,
-        winrate: winrate,     // Raw decimal (0.533 = 53.3%)
-        pickrate: pickrate,   // Raw decimal (0.015 = 1.5%)
+        winrate: winrate, // Raw decimal (0.533 = 53.3%)
+        pickrate: pickrate, // Raw decimal (0.015 = 1.5%)
         games: champ.games_analyzed || 0,
       });
       rankCounter++;
@@ -461,10 +461,18 @@ function formatBuildResponse(data, champion, role) {
     2033, // Corrupting Potion
     2055, // Control Ward
     // Support items
-    3850, 3851, 3853, // Spellthief's line
-    3854, 3855, 3857, // Relic Shield line
-    3858, 3859, 3860, // Spectral Sickle line
-    3862, 3863, 3864, // Steel Shoulderguards line
+    3850,
+    3851,
+    3853, // Spellthief's line
+    3854,
+    3855,
+    3857, // Relic Shield line
+    3858,
+    3859,
+    3860, // Spectral Sickle line
+    3862,
+    3863,
+    3864, // Steel Shoulderguards line
     // Long Sword / Amplifying Tome for some builds
     1036, // Long Sword (350g)
     1037, // Pickaxe - NOT a starter, removing
@@ -1082,5 +1090,5 @@ function getSpellName(spellId) {
  * Get application version.
  */
 export function getAppVersion() {
-  return "1.5.2";
+  return "1.5.3";
 }
