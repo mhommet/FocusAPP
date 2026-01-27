@@ -1082,5 +1082,5 @@ function getSpellName(spellId) {
  * Get application version.
  */
 export function getAppVersion() {
-  return "1.5.1";
+  return "1.5.2";
 }

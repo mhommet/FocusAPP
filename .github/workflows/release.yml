@@ -15,6 +15,17 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        uses: janheinrichmerker/action-github-changelog-generator@v2.4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          sinceTag: ${{ github.ref_name }}
+          compareLink: true
+          simpleList: true  # Liste simple comme votre script original
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -60,14 +71,11 @@ jobs:
 
             ### What's New
 
-            - Diamond+ tier lists with win/pick/ban rates
-            - Optimized builds (runes, items, skills)
-            - Items database with gold efficiency
-            - Catppuccin Mocha dark theme
+            ${{ steps.changelog.outputs.changelog }}
 
             ---
 
-            **Full Changelog**: https://github.com/${{ github.repository }}/compare/....${{ github.ref_name }}
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ github.ref_name }}
           releaseDraft: false
           prerelease: false
 
