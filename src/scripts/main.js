@@ -107,6 +107,19 @@ let lastAutoImportedChampion = null;
 let inChampionSelect = false;
 
 // =============================================================================
+// GLOBAL SEARCH STATE
+// =============================================================================
+
+/** @type {Array<Object>} Cached champions list for global search */
+let globalSearchChampions = [];
+
+/** @type {number|null} Debounce timer for global search */
+let globalSearchDebounce = null;
+
+/** @type {number} Highlighted index for keyboard navigation */
+let globalSearchHighlightIndex = -1;
+
+// =============================================================================
 // INITIALIZATION
 // =============================================================================
 
@@ -129,6 +142,10 @@ async function init() {
     }
 
     hideBackendError();
+
+    // Load champions for global search (in background)
+    loadGlobalSearchChampions();
+
     refreshTierList();
 }
 
@@ -194,6 +211,9 @@ function switchTab(tabName) {
     }
     if (tabName === 'builds' && !championListLoaded) {
         loadChampionGrid();
+    }
+    if (tabName === 'changelog') {
+        initChangelog();
     }
 }
 
@@ -527,7 +547,7 @@ function updatePagination(totalPages) {
     }
 
     let html = `
-        <button class="pagination-btn" onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+        <button class="pagination-btn" data-page="${currentPage - 1}" ${currentPage === 1 ? 'disabled' : ''}>
             <i class="fas fa-chevron-left"></i>
         </button>
     `;
@@ -536,25 +556,25 @@ function updatePagination(totalPages) {
     const endPage = Math.min(totalPages, currentPage + 2);
 
     if (startPage > 1) {
-        html += `<button class="pagination-btn" onclick="goToPage(1)">1</button>`;
+        html += `<button class="pagination-btn" data-page="1">1</button>`;
         if (startPage > 2) html += `<span class="pagination-info">...</span>`;
     }
 
     for (let i = startPage; i <= endPage; i++) {
-        html += `<button class="pagination-btn ${i === currentPage ? 'active' : ''}" onclick="goToPage(${i})">${i}</button>`;
+        html += `<button class="pagination-btn ${i === currentPage ? 'active' : ''}" data-page="${i}">${i}</button>`;
     }
 
     if (endPage < totalPages) {
         if (endPage < totalPages - 1) html += `<span class="pagination-info">...</span>`;
-        html += `<button class="pagination-btn" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+        html += `<button class="pagination-btn" data-page="${totalPages}">${totalPages}</button>`;
     }
 
     html += `
-        <button class="pagination-btn" onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+        <button class="pagination-btn" data-page="${currentPage + 1}" ${currentPage === totalPages ? 'disabled' : ''}>
             <i class="fas fa-chevron-right"></i>
         </button>
         <span class="pagination-info">${filteredChampions.length} champions</span>
-        <select class="pagination-select" onchange="changeItemsPerPage(this.value)">
+        <select class="pagination-select" data-action="items-per-page">
             <option value="25" ${itemsPerPage === 25 ? 'selected' : ''}>25 / page</option>
             <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50 / page</option>
             <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100 / page</option>
@@ -562,6 +582,24 @@ function updatePagination(totalPages) {
     `;
 
     pagination.innerHTML = html;
+
+    // Attach event listeners for pagination buttons (using event delegation pattern)
+    pagination.querySelectorAll('.pagination-btn[data-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const page = parseInt(btn.dataset.page);
+            if (!isNaN(page) && !btn.disabled) {
+                goToPage(page);
+            }
+        });
+    });
+
+    // Attach event listener for items per page select
+    const perPageSelect = pagination.querySelector('.pagination-select[data-action="items-per-page"]');
+    if (perPageSelect) {
+        perPageSelect.addEventListener('change', (e) => {
+            changeItemsPerPage(e.target.value);
+        });
+    }
 }
 
 function goToPage(page) {
@@ -796,7 +834,7 @@ function updateItemsPagination(totalPages) {
     }
 
     let html = `
-        <button class="pagination-btn" onclick="goToItemsPage(${itemsPage - 1})" ${itemsPage === 1 ? 'disabled' : ''}>
+        <button class="pagination-btn" data-items-page="${itemsPage - 1}" ${itemsPage === 1 ? 'disabled' : ''}>
             <i class="fas fa-chevron-left"></i>
         </button>
     `;
@@ -805,27 +843,37 @@ function updateItemsPagination(totalPages) {
     const endPage = Math.min(totalPages, itemsPage + 2);
 
     if (startPage > 1) {
-        html += `<button class="pagination-btn" onclick="goToItemsPage(1)">1</button>`;
+        html += `<button class="pagination-btn" data-items-page="1">1</button>`;
         if (startPage > 2) html += `<span class="pagination-info">...</span>`;
     }
 
     for (let i = startPage; i <= endPage; i++) {
-        html += `<button class="pagination-btn ${i === itemsPage ? 'active' : ''}" onclick="goToItemsPage(${i})">${i}</button>`;
+        html += `<button class="pagination-btn ${i === itemsPage ? 'active' : ''}" data-items-page="${i}">${i}</button>`;
     }
 
     if (endPage < totalPages) {
         if (endPage < totalPages - 1) html += `<span class="pagination-info">...</span>`;
-        html += `<button class="pagination-btn" onclick="goToItemsPage(${totalPages})">${totalPages}</button>`;
+        html += `<button class="pagination-btn" data-items-page="${totalPages}">${totalPages}</button>`;
     }
 
     html += `
-        <button class="pagination-btn" onclick="goToItemsPage(${itemsPage + 1})" ${itemsPage === totalPages ? 'disabled' : ''}>
+        <button class="pagination-btn" data-items-page="${itemsPage + 1}" ${itemsPage === totalPages ? 'disabled' : ''}>
             <i class="fas fa-chevron-right"></i>
         </button>
         <span class="pagination-info">${filteredItems.length} items</span>
     `;
 
     pagination.innerHTML = html;
+
+    // Attach event listeners for items pagination buttons
+    pagination.querySelectorAll('.pagination-btn[data-items-page]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const page = parseInt(btn.dataset.itemsPage);
+            if (!isNaN(page) && !btn.disabled) {
+                goToItemsPage(page);
+            }
+        });
+    });
 }
 
 function goToItemsPage(page) {
@@ -2149,6 +2197,591 @@ function renderBuild(build) {
 }
 
 // =============================================================================
+// GLOBAL CHAMPION SEARCH
+// =============================================================================
+
+/**
+ * Load champions for global search (uses localStorage cache).
+ * @returns {Promise<void>}
+ */
+async function loadGlobalSearchChampions() {
+    // Try localStorage cache first
+    const cached = localStorage.getItem('focusapp_champions');
+    if (cached) {
+        try {
+            const parsed = JSON.parse(cached);
+            // Check if cache is less than 24 hours old
+            if (parsed.timestamp && Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+                globalSearchChampions = parsed.data;
+                console.log(`[GlobalSearch] Loaded ${globalSearchChampions.length} champions from cache`);
+                return;
+            }
+        } catch (e) {
+            console.warn('[GlobalSearch] Cache parse error:', e);
+        }
+    }
+
+    // Fetch fresh data
+    const champions = await getChampionList();
+    if (champions && champions.length > 0) {
+        globalSearchChampions = champions;
+        // Cache with timestamp
+        localStorage.setItem('focusapp_champions', JSON.stringify({
+            data: champions,
+            timestamp: Date.now()
+        }));
+        console.log(`[GlobalSearch] Cached ${champions.length} champions`);
+    }
+}
+
+/**
+ * Perform global champion search with debounce.
+ * Shows champion + role combinations based on tierlist data.
+ * @param {string} query - Search query
+ */
+function globalSearch(query) {
+    const dropdown = document.getElementById('global-search-results');
+    if (!dropdown) return;
+
+    // Clear previous debounce
+    if (globalSearchDebounce) {
+        clearTimeout(globalSearchDebounce);
+    }
+
+    // Hide if query too short
+    if (query.length < 2) {
+        dropdown.classList.remove('visible');
+        dropdown.innerHTML = '';
+        globalSearchHighlightIndex = -1;
+        return;
+    }
+
+    // Debounce 200ms
+    globalSearchDebounce = setTimeout(() => {
+        const queryLower = query.toLowerCase();
+
+        // Find matching champions from DDragon list
+        const matchingChampions = globalSearchChampions.filter(c =>
+            c.name.toLowerCase().includes(queryLower) ||
+            c.id.toLowerCase().includes(queryLower)
+        ).slice(0, 6);
+
+        // Build results with available roles from tierlist data
+        const results = [];
+
+        for (const champ of matchingChampions) {
+            // Find this champion's roles from tierlist (allChampions contains role info)
+            const tierlistEntries = allChampions.filter(tc =>
+                tc.name.toLowerCase() === champ.name.toLowerCase()
+            );
+
+            // Get unique roles from all tierlist entries
+            const roles = new Set();
+
+            tierlistEntries.forEach(entry => {
+                if (entry.role) {
+                    // Parse role string (could be "Top", "Top, Mid", "Mid", etc.)
+                    entry.role.split(',').forEach(r => {
+                        let normalized = r.trim().toLowerCase();
+                        // Normalize role names
+                        if (normalized === 'middle') normalized = 'mid';
+                        if (normalized === 'bottom') normalized = 'adc';
+                        if (normalized === 'utility') normalized = 'support';
+                        if (normalized && normalized !== 'flex') {
+                            roles.add(normalized);
+                        }
+                    });
+                }
+            });
+
+            // ALWAYS check flex picks mapping to add additional roles
+            // Because tierlist "all" only shows primary role
+            const flexRoles = getDefaultRolesForChampion(champ.name);
+            flexRoles.forEach(r => roles.add(r));
+
+            // If still no roles, default to mid
+            if (roles.size === 0) {
+                roles.add('mid');
+            }
+
+            // Add entry for each role
+            roles.forEach(role => {
+                results.push({
+                    ...champ,
+                    role: role,
+                    roleDisplay: capitalizeRole(role)
+                });
+            });
+        }
+
+        // Sort results: group by champion name, then by role order
+        const roleOrder = { 'top': 0, 'jungle': 1, 'mid': 2, 'adc': 3, 'support': 4 };
+        results.sort((a, b) => {
+            if (a.name !== b.name) return a.name.localeCompare(b.name);
+            return (roleOrder[a.role] || 5) - (roleOrder[b.role] || 5);
+        });
+
+        renderGlobalSearchResults(results.slice(0, 10));
+    }, 200);
+}
+
+/**
+ * Capitalize role name for display.
+ * @param {string} role - Role name
+ * @returns {string} Capitalized role
+ */
+function capitalizeRole(role) {
+    const roleMap = {
+        'top': 'Top',
+        'jungle': 'Jungle',
+        'mid': 'Mid',
+        'middle': 'Mid',
+        'adc': 'ADC',
+        'bottom': 'ADC',
+        'support': 'Support',
+        'utility': 'Support'
+    };
+    return roleMap[role.toLowerCase()] || role.charAt(0).toUpperCase() + role.slice(1);
+}
+
+/**
+ * Get default roles for a champion (common flex picks).
+ * Used when champion is not found in current tierlist data.
+ * @param {string} champName - Champion name
+ * @returns {Array<string>} Array of role names
+ */
+function getDefaultRolesForChampion(champName) {
+    // Common flex picks mapping
+    const flexPicks = {
+        'akali': ['mid', 'top'],
+        'yone': ['mid', 'top'],
+        'yasuo': ['mid', 'top', 'adc'],
+        'sylas': ['mid', 'top', 'jungle'],
+        'pantheon': ['mid', 'top', 'support'],
+        'sett': ['top', 'mid', 'support'],
+        'gragas': ['top', 'jungle', 'mid'],
+        'karma': ['support', 'mid', 'top'],
+        'lulu': ['support', 'mid'],
+        'seraphine': ['support', 'mid', 'adc'],
+        'swain': ['support', 'mid', 'adc'],
+        'brand': ['support', 'mid'],
+        'zyra': ['support', 'mid'],
+        'xerath': ['support', 'mid'],
+        'velkoz': ['support', 'mid'],
+        'morgana': ['support', 'mid', 'jungle'],
+        'neeko': ['mid', 'support', 'top'],
+        'kennen': ['top', 'mid', 'adc'],
+        'jayce': ['top', 'mid'],
+        'gangplank': ['top', 'mid'],
+        'quinn': ['top', 'mid', 'adc'],
+        'vayne': ['adc', 'top'],
+        'lucian': ['adc', 'mid'],
+        'tristana': ['adc', 'mid'],
+        'corki': ['mid', 'adc'],
+        'ezreal': ['adc', 'mid'],
+        'kaisa': ['adc', 'mid'],
+        'viego': ['jungle', 'mid', 'top'],
+        'lee sin': ['jungle', 'mid', 'top'],
+        'leesin': ['jungle', 'mid', 'top'],
+        'nidalee': ['jungle', 'mid'],
+        'taliyah': ['jungle', 'mid'],
+        'graves': ['jungle', 'top'],
+        'kindred': ['jungle', 'adc'],
+        'pyke': ['support', 'mid'],
+        'senna': ['support', 'adc'],
+        'heimerdinger': ['mid', 'top', 'support'],
+        'zilean': ['support', 'mid'],
+        'aurora': ['mid', 'top'],
+        'ambessa': ['top', 'jungle'],
+        'hwei': ['mid', 'support'],
+        'smolder': ['adc', 'mid'],
+        'naafiri': ['mid', 'jungle'],
+        'milio': ['support'],
+    };
+
+    const normalized = champName.toLowerCase().replace(/['\s.]/g, '');
+    return flexPicks[normalized] || ['mid']; // Default to mid if unknown
+}
+
+/**
+ * Render global search results dropdown with roles.
+ * @param {Array<Object>} matches - Matching champions with role info
+ */
+function renderGlobalSearchResults(matches) {
+    const dropdown = document.getElementById('global-search-results');
+    if (!dropdown) return;
+
+    globalSearchHighlightIndex = -1;
+
+    if (matches.length === 0) {
+        dropdown.innerHTML = `
+            <div class="global-search-empty">
+                <i class="fas fa-search"></i>
+                No champions found
+            </div>
+        `;
+        dropdown.classList.add('visible');
+        return;
+    }
+
+    const roleIcons = {
+        'top': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-top.png',
+        'jungle': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-jungle.png',
+        'mid': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png',
+        'middle': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-middle.png',
+        'adc': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png',
+        'bottom': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-bottom.png',
+        'support': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png',
+        'utility': 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-clash/global/default/assets/images/position-selector/positions/icon-position-utility.png'
+    };
+
+    dropdown.innerHTML = matches.map((champ, index) => {
+        const roleIcon = roleIcons[champ.role] || roleIcons['top'];
+        const roleForApi = normalizeRoleForBuild(champ.roleDisplay);
+
+        return `
+            <div class="global-search-result" data-id="${champ.id}" data-name="${champ.name}" data-role="${roleForApi}" data-index="${index}">
+                <img src="${champ.image}" alt="${champ.name}" class="global-search-champ-icon" onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.1.1/img/champion/Aatrox.png'">
+                <div class="global-search-result-info">
+                    <div class="global-search-result-name">${champ.name}</div>
+                    <div class="global-search-result-role">
+                        <img src="${roleIcon}" alt="${champ.roleDisplay}" class="global-search-role-icon">
+                        <span>${champ.roleDisplay}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    dropdown.classList.add('visible');
+
+    // Add click handlers
+    dropdown.querySelectorAll('.global-search-result').forEach(item => {
+        item.addEventListener('click', () => {
+            selectChampionFromGlobalSearch(item.dataset.id, item.dataset.name, item.dataset.role);
+        });
+    });
+}
+
+/**
+ * Select champion from global search and navigate to builds.
+ * @param {string} champId - Champion ID
+ * @param {string} champName - Champion name
+ * @param {string} role - Selected role (top, jungle, mid, adc, support)
+ */
+function selectChampionFromGlobalSearch(champId, champName, role = 'top') {
+    const searchInput = document.getElementById('global-search');
+    const dropdown = document.getElementById('global-search-results');
+
+    // Clear search
+    if (searchInput) searchInput.value = '';
+    if (dropdown) {
+        dropdown.classList.remove('visible');
+        dropdown.innerHTML = '';
+    }
+    globalSearchHighlightIndex = -1;
+
+    // Switch to builds tab
+    switchTab('builds');
+
+    // Update the builds tab champion search
+    const buildSearch = document.getElementById('champion-search');
+    if (buildSearch) {
+        buildSearch.value = champName;
+        const wrapper = buildSearch.closest('.search-input-wrapper');
+        if (wrapper) wrapper.classList.add('has-value');
+    }
+
+    // Set the role selector to match
+    const roleSelect = document.getElementById('role-select');
+    if (roleSelect) {
+        roleSelect.value = role;
+    }
+
+    // Set the selected champion and load build
+    selectedChampion = champId;
+    selectedChampionName = champName;
+
+    // Update champion grid selection
+    document.querySelectorAll('.champ-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.id === champId);
+    });
+
+    // Hide champion grid
+    const grid = document.getElementById('champion-grid');
+    if (grid) grid.classList.remove('visible');
+
+    // Load the build with the selected role
+    loadChampionBuild(champName);
+
+    console.log(`[GlobalSearch] Selected ${champName} ${role} -> Builds tab`);
+}
+
+/**
+ * Handle keyboard navigation in global search.
+ * @param {KeyboardEvent} e - Keyboard event
+ */
+function handleGlobalSearchKeyboard(e) {
+    const dropdown = document.getElementById('global-search-results');
+    if (!dropdown || !dropdown.classList.contains('visible')) return;
+
+    const items = dropdown.querySelectorAll('.global-search-result');
+    if (items.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        globalSearchHighlightIndex = Math.min(globalSearchHighlightIndex + 1, items.length - 1);
+        updateGlobalSearchHighlight(items);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        globalSearchHighlightIndex = Math.max(globalSearchHighlightIndex - 1, 0);
+        updateGlobalSearchHighlight(items);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (globalSearchHighlightIndex >= 0 && items[globalSearchHighlightIndex]) {
+            const item = items[globalSearchHighlightIndex];
+            selectChampionFromGlobalSearch(item.dataset.id, item.dataset.name, item.dataset.role);
+        } else if (items.length > 0) {
+            // Select first result
+            const firstItem = items[0];
+            selectChampionFromGlobalSearch(firstItem.dataset.id, firstItem.dataset.name, firstItem.dataset.role);
+        }
+    } else if (e.key === 'Escape') {
+        dropdown.classList.remove('visible');
+        document.getElementById('global-search')?.blur();
+        globalSearchHighlightIndex = -1;
+    }
+}
+
+/**
+ * Update highlight state for keyboard navigation.
+ * @param {NodeList} items - Search result items
+ */
+function updateGlobalSearchHighlight(items) {
+    items.forEach((item, index) => {
+        item.classList.toggle('highlighted', index === globalSearchHighlightIndex);
+    });
+
+    // Scroll into view
+    if (globalSearchHighlightIndex >= 0 && items[globalSearchHighlightIndex]) {
+        items[globalSearchHighlightIndex].scrollIntoView({ block: 'nearest' });
+    }
+}
+
+// =============================================================================
+// CHANGELOG MANAGER - GitHub Releases & Commits
+// =============================================================================
+
+/**
+ * ChangelogManager - Fetches and displays GitHub releases and commits.
+ */
+class ChangelogManager {
+    constructor(repo = 'mhommet/FocusAPP') {
+        this.repo = repo;
+        this.releasesUrl = `https://api.github.com/repos/${repo}/releases?per_page=10`;
+        this.loaded = false;
+    }
+
+    /**
+     * Fetch using Tauri HTTP plugin (required for external URLs in built app).
+     */
+    async tauriFetch(url) {
+        // Use Tauri's HTTP plugin if available (for built app)
+        if (window.__TAURI__?.http?.fetch) {
+            const response = await window.__TAURI__.http.fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/vnd.github.v3+json',
+                    'User-Agent': 'FocusApp/1.4.0'
+                }
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            // Tauri v2 HTTP plugin uses same API as native fetch
+            return await response.json();
+        }
+        // Fallback to native fetch (for dev mode / browser)
+        const response = await fetch(url, {
+            headers: {
+                'Accept': 'application/vnd.github.v3+json'
+            }
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+    }
+
+    /**
+     * Fetch changelog data from GitHub API.
+     */
+    async fetchChangelog() {
+        const container = document.getElementById('changelog-list');
+        if (!container) return;
+
+        // Show loading
+        container.innerHTML = `
+            <div class="changelog-loading">
+                <div class="spinner-ring"></div>
+                <span>Loading changelog...</span>
+            </div>
+        `;
+
+        try {
+            const releases = await this.tauriFetch(this.releasesUrl);
+            this.renderChangelog(releases || []);
+            this.loaded = true;
+        } catch (error) {
+            console.error('[Changelog] Fetch failed:', error);
+            this.renderFallback();
+        }
+    }
+
+    /**
+     * Render changelog with releases only (no commits).
+     */
+    renderChangelog(releases) {
+        const container = document.getElementById('changelog-list');
+        if (!container) return;
+
+        let html = '';
+
+        if (releases && releases.length > 0) {
+            releases.forEach((release) => {
+                const date = new Date(release.published_at).toLocaleDateString('fr-FR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                });
+
+                // Format release notes - convert markdown to HTML
+                let notes = release.body || '';
+                if (notes) {
+                    // Normalize line endings
+                    notes = notes.replace(/\r\n/g, '\n');
+                    // Remove # headers (title already shown)
+                    notes = notes.replace(/^# .+$/gm, '');
+                    // Convert ## headers to styled divs
+                    notes = notes.replace(/^## (.+)$/gm, '<div class="release-subtitle">$1</div>');
+                    // Convert ### headers to bold
+                    notes = notes.replace(/^### (.+)$/gm, '<div class="release-section">$1</div>');
+                    // Convert horizontal rules
+                    notes = notes.replace(/^---+$/gm, '<hr>');
+                    // Convert **bold**
+                    notes = notes.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                    // Convert `code`
+                    notes = notes.replace(/`([^`]+)`/g, '<code>$1</code>');
+                    // Convert > blockquotes
+                    notes = notes.replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>');
+                    // Convert markdown links
+                    notes = notes.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+                    // Convert bare URLs to links
+                    notes = notes.replace(/(^|[^"'>])(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+                    // Convert bullet lists (* or -)
+                    notes = notes.replace(/^[*-] (.+)$/gm, '<li>$1</li>');
+                    // Convert numbered lists (1. 2. etc.)
+                    notes = notes.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+                    // Wrap consecutive <li> in <ul>
+                    notes = notes.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+                    // Convert double line breaks
+                    notes = notes.replace(/\n\n+/g, '<br><br>');
+                    // Convert single line breaks
+                    notes = notes.replace(/\n/g, '<br>');
+                    // Clean up extra breaks around block elements
+                    notes = notes.replace(/<br>(<div|<ul|<hr|<blockquote)/g, '$1');
+                    notes = notes.replace(/(<\/div>|<\/ul>|<hr>|<\/blockquote>)<br>/g, '$1');
+                    notes = notes.replace(/<br><br><br>+/g, '<br><br>');
+                }
+
+                html += `
+                    <div class="release-item">
+                        <div class="release-header">
+                            <span class="release-tag">${this.escapeHtml(release.tag_name)}</span>
+                            <span class="release-date"><i class="fas fa-calendar"></i> ${date}</span>
+                        </div>
+                        <h4 class="release-title">${this.escapeHtml(release.name || release.tag_name)}</h4>
+                        <div class="release-notes">${notes || '<em>No release notes</em>'}</div>
+                        <a href="${release.html_url}" target="_blank" rel="noopener" class="release-link">
+                            <i class="fab fa-github"></i> View on GitHub <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </div>
+                `;
+            });
+        } else {
+            html = `
+                <div class="changelog-empty">
+                    <i class="fas fa-scroll"></i>
+                    <p>No releases available yet</p>
+                </div>
+            `;
+        }
+
+        container.innerHTML = html;
+        console.log('[Changelog] HTML set, container children:', container.children.length);
+    }
+
+    /**
+     * Render fallback content when API fails.
+     */
+    renderFallback() {
+        const container = document.getElementById('changelog-list');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div class="changelog-section-title"><i class="fas fa-tag"></i> Latest Version</div>
+            <div class="release-item">
+                <div class="release-header">
+                    <span class="release-tag">v1.4.0</span>
+                    <span class="release-date"><i class="fas fa-calendar"></i> 27 Janvier 2026</span>
+                </div>
+                <h4 class="release-title">CSS Modular + Global Search + API Key</h4>
+                <div class="release-notes">
+- 9 fichiers CSS modulaires (Catppuccin Mocha)
+- Global search champions avec roles
+- API Key authentication
+- Pagination fix pour Vite prod
+- Triple Tonic rune fix
+                </div>
+            </div>
+            <div class="changelog-error">
+                <i class="fas fa-wifi"></i>
+                <p>Unable to fetch live data from GitHub</p>
+            </div>
+        `;
+    }
+
+    /**
+     * Escape HTML to prevent XSS.
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// Global changelog instance
+let changelogManager = null;
+
+/**
+ * Initialize changelog manager.
+ */
+function initChangelog() {
+    if (!changelogManager) {
+        changelogManager = new ChangelogManager();
+    }
+    if (!changelogManager.loaded) {
+        changelogManager.fetchChangelog();
+    }
+}
+
+/**
+ * Refresh changelog data.
+ */
+function refreshChangelog() {
+    if (changelogManager) {
+        changelogManager.fetchChangelog();
+    }
+}
+
+// =============================================================================
 // GLOBAL EXPORTS (pour compatibilité onclick inline)
 // =============================================================================
 
@@ -2177,6 +2810,11 @@ window.updateChampionGrid = updateChampionGrid;
 window.updateSortIndicators = updateSortIndicators;
 window.navigateToBuildForChampion = navigateToBuildForChampion;
 window.normalizeRoleForBuild = normalizeRoleForBuild;
+window.globalSearch = globalSearch;
+window.selectChampionFromGlobalSearch = selectChampionFromGlobalSearch;
+window.loadGlobalSearchChampions = loadGlobalSearchChampions;
+window.initChangelog = initChangelog;
+window.refreshChangelog = refreshChangelog;
 
 // =============================================================================
 // EVENT LISTENERS (Alternative aux onclick inline)
@@ -2441,6 +3079,44 @@ document.addEventListener('DOMContentLoaded', () => {
     if (retryBtn) {
         retryBtn.addEventListener('click', retryBackendConnection);
         console.log('✅ Retry button attached');
+    }
+
+    // ✅ CHANGELOG REFRESH BUTTON
+    const refreshChangelogBtn = document.getElementById('refresh-changelog');
+    if (refreshChangelogBtn) {
+        refreshChangelogBtn.addEventListener('click', refreshChangelog);
+        console.log('✅ Changelog refresh button attached');
+    }
+
+    // ✅ GLOBAL SEARCH (Header)
+    const globalSearchInput = document.getElementById('global-search');
+    const globalSearchDropdown = document.getElementById('global-search-results');
+    if (globalSearchInput) {
+        // Live search on input
+        globalSearchInput.addEventListener('input', (e) => {
+            globalSearch(e.target.value);
+        });
+
+        // Keyboard navigation
+        globalSearchInput.addEventListener('keydown', handleGlobalSearchKeyboard);
+
+        // Show dropdown on focus if there's text
+        globalSearchInput.addEventListener('focus', () => {
+            if (globalSearchInput.value.length >= 2) {
+                globalSearch(globalSearchInput.value);
+            }
+        });
+
+        // Hide dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const container = document.querySelector('.global-search-wrapper');
+            if (container && !container.contains(e.target) && globalSearchDropdown) {
+                globalSearchDropdown.classList.remove('visible');
+                globalSearchHighlightIndex = -1;
+            }
+        });
+
+        console.log('✅ Global search attached');
     }
 
     // Fix: Prevent auto-select on search inputs

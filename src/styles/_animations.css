@@ -1,0 +1,406 @@
+/* =============================================================================
+   ANIMATIONS - Keyframes, Hover Effects, Loading States
+   ============================================================================= */
+
+/* --- ENTRY ANIMATION --- */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- SPINNER --- */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-smooth {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* --- PULSE ANIMATIONS --- */
+@keyframes pulse-warning {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(243, 139, 168, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 5px rgba(243, 139, 168, 0.2);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 5px rgba(249, 226, 175, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(249, 226, 175, 0.6);
+  }
+}
+
+/* --- SKELETON LOADER --- */
+@keyframes skeleton-pulse {
+  0% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(205, 214, 244, 0.1) 25%,
+    rgba(205, 214, 244, 0.2) 50%,
+    rgba(205, 214, 244, 0.1) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.skeleton-text {
+  height: 16px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+}
+
+.skeleton-text.short {
+  width: 60%;
+}
+
+.skeleton-text.medium {
+  width: 80%;
+}
+
+.skeleton-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+}
+
+.skeleton-icon.round {
+  border-radius: 50%;
+}
+
+.skeleton-icon.keystone {
+  width: 64px;
+  height: 64px;
+}
+
+.skeleton-icon.small {
+  width: 32px;
+  height: 32px;
+}
+
+/* --- DROPDOWN ANIMATION --- */
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* --- SELECT PULSE --- */
+@keyframes selectPulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* --- PROGRESS BAR --- */
+@keyframes progress-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(250%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/* --- TOAST NOTIFICATION --- */
+@keyframes toast-slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInToast {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* --- TOAST NOTIFICATIONS --- */
+.toast-notification {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  border-radius: 10px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 9999;
+  animation: slideInToast 0.3s ease-out;
+  backdrop-filter: blur(8px);
+}
+
+.toast-notification.toast-success {
+  background: linear-gradient(
+    135deg,
+    rgba(34, 197, 94, 0.95),
+    rgba(22, 163, 74, 0.95)
+  );
+  color: white;
+}
+
+.toast-notification.toast-info {
+  background: linear-gradient(
+    135deg,
+    rgba(59, 130, 246, 0.95),
+    rgba(37, 99, 235, 0.95)
+  );
+  color: white;
+}
+
+.toast-notification.toast-error {
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.95),
+    rgba(220, 38, 38, 0.95)
+  );
+  color: white;
+}
+
+.toast-notification.toast-warning {
+  background: linear-gradient(135deg, rgba(249, 226, 175, 0.95), rgba(249, 226, 175, 0.85));
+  color: #1e1e2e;
+  border: 1px solid rgba(249, 226, 175, 0.8);
+}
+
+/* --- BUILD LOADING SPINNER --- */
+.build-loading-spinner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  gap: 24px;
+}
+
+.spinner-container {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.spinner-ring-outer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 3px solid rgba(205, 214, 244, 0.1);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin-smooth 1.2s linear infinite;
+}
+
+.spinner-ring-inner {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: calc(100% - 20px);
+  height: calc(100% - 20px);
+  border: 3px solid rgba(205, 214, 244, 0.1);
+  border-bottom-color: var(--accent-hover);
+  border-radius: 50%;
+  animation: spin-smooth 0.8s linear infinite reverse;
+}
+
+.spinner-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.5rem;
+  color: var(--accent-color);
+  animation: pulse-glow 1.5s ease-in-out infinite;
+}
+
+.build-loading-spinner .loading-text {
+  font-size: 1.1rem;
+  color: var(--text-secondary);
+}
+
+.build-loading-spinner .loading-champion {
+  font-size: 1.3rem;
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+.loading-progress {
+  width: 200px;
+  height: 4px;
+  background: rgba(205, 214, 244, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.loading-progress-bar {
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, var(--accent-color), var(--accent-hover));
+  border-radius: 2px;
+  animation: progress-slide 1.5s ease-in-out infinite;
+}
+
+/* --- BUILD SKELETON --- */
+.build-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 20px;
+}
+
+.build-skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 24px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+}
+
+.build-skeleton-header .skeleton-champion-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  flex-shrink: 0;
+}
+
+.build-skeleton-header .skeleton-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.build-skeleton-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+.build-skeleton-section {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 20px;
+}
+
+.build-skeleton-section .skeleton-title {
+  height: 20px;
+  width: 120px;
+  margin-bottom: 16px;
+}
+
+.build-skeleton-section .skeleton-items-row {
+  display: flex;
+  gap: 10px;
+}
+
+.build-skeleton-section .skeleton-runes {
+  display: flex;
+  gap: 30px;
+}
+
+.build-skeleton-section .skeleton-rune-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- SKELETON TABLE ROWS --- */
+.skeleton-table-row {
+  display: grid;
+  grid-template-columns: 60px 1fr 100px 80px 100px;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(205, 214, 244, 0.03);
+}
+
+.skeleton-table-row .skeleton-cell {
+  height: 20px;
+  border-radius: 4px;
+}
+
+/* --- MICRO-INTERACTIONS --- */
+.btn-refresh:active,
+.btn-import:active:not(:disabled),
+.btn-refresh-small:active:not(:disabled),
+.retry-btn:active {
+  transform: scale(0.98);
+}

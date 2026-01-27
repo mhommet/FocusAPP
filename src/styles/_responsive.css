@@ -1,0 +1,388 @@
+/* =============================================================================
+   RESPONSIVE - Media Queries for All Screen Sizes
+   ============================================================================= */
+
+/* --- TABLET (max-width: 1200px) --- */
+@media (max-width: 1200px) {
+  .items-controls-bar {
+    flex-wrap: wrap;
+  }
+
+  .search-group-inline {
+    flex: 1 1 100%;
+    max-width: none;
+    min-width: auto;
+  }
+}
+
+/* --- TABLET (max-width: 1024px) --- */
+@media (max-width: 1024px) {
+  .build-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- SMALL TABLET (max-width: 900px) --- */
+@media (max-width: 900px) {
+  .hint-group {
+    display: none;
+  }
+}
+
+/* --- MOBILE (max-width: 768px) --- */
+@media (max-width: 768px) {
+  body {
+    padding: 20px 10px;
+  }
+
+  .container {
+    max-width: 100%;
+  }
+
+  /* Controls Bar */
+  .controls-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+    padding: 12px 16px;
+  }
+
+  .search-group {
+    margin-left: 0;
+    max-width: 100%;
+  }
+
+  select,
+  input {
+    width: 100%;
+  }
+
+  /* Tabs */
+  .tabs-nav {
+    flex-direction: column;
+  }
+
+  .tab-btn {
+    justify-content: center;
+  }
+
+  /* Items Grid */
+  .items-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+
+  /* Runes */
+  .runes-container {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .rune-divider {
+    width: 80%;
+    height: 1px;
+  }
+
+  .rune-icon.keystone {
+    width: 56px;
+    height: 56px;
+  }
+
+  .rune-icon.small {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* Build Items */
+  .build-item {
+    width: 42px;
+    height: 42px;
+  }
+
+  /* Summoner Icons */
+  .summoner-icon-small {
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Stat Shards */
+  .stat-shards-grid {
+    gap: 10px;
+  }
+
+  .stat-shard-item {
+    min-width: 50px;
+    padding: 8px;
+  }
+
+  .stat-shard-item .rune-shard {
+    width: 30px;
+    height: 30px;
+  }
+
+  /* Header */
+  header {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  /* Build Header */
+  .build-header {
+    flex-direction: column;
+    text-align: center;
+    padding: 16px;
+  }
+
+  .build-actions {
+    margin-left: 0;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .build-champion-info {
+    text-align: center;
+  }
+
+  .build-champion-info h2 {
+    font-size: 1.5rem;
+  }
+
+  .build-meta {
+    justify-content: center;
+  }
+
+  /* Table */
+  table {
+    font-size: 0.85rem;
+  }
+
+  thead th,
+  tbody td {
+    padding: 12px 8px;
+  }
+
+  /* Pagination */
+  .pagination {
+    gap: 4px;
+    padding: 12px;
+  }
+
+  .pagination-btn {
+    padding: 8px 12px;
+    min-width: 36px;
+    font-size: 0.85rem;
+  }
+
+  .pagination-select {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+    margin-left: 8px;
+  }
+
+  /* Champion Grid */
+  .champion-grid {
+    grid-template-columns: repeat(auto-fill, 48px);
+  }
+
+  .champ-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .champ-name {
+    font-size: 8px;
+  }
+
+  /* Build Links */
+  .build-links {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- SMALL MOBILE (max-width: 480px) --- */
+@media (max-width: 480px) {
+  body {
+    padding: 10px 8px;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .version-badge {
+    font-size: 0.35em;
+    padding: 3px 6px;
+  }
+
+  .controls-bar {
+    padding: 10px 12px;
+  }
+
+  .tab-btn {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+
+  .btn-refresh {
+    padding: 10px 16px;
+    font-size: 0.9rem;
+  }
+
+  .card {
+    padding: 3px;
+    border-radius: 16px;
+  }
+
+  /* Table on very small screens */
+  thead th,
+  tbody td {
+    padding: 10px 6px;
+    font-size: 0.8rem;
+  }
+
+  /* Hide some columns on very small screens */
+  thead th:nth-child(6),
+  tbody td:nth-child(6),
+  thead th:nth-child(7),
+  tbody td:nth-child(7) {
+    display: none;
+  }
+
+  /* Runes */
+  .rune-icon.keystone {
+    width: 48px;
+    height: 48px;
+  }
+
+  .rune-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Build Items */
+  .build-item {
+    width: 38px;
+    height: 38px;
+  }
+
+  /* Items Grid */
+  .item-card {
+    padding: 12px;
+  }
+
+  .item-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .item-name {
+    font-size: 0.9rem;
+  }
+
+  .item-gold {
+    font-size: 0.8rem;
+  }
+
+  .item-stats {
+    font-size: 0.75rem;
+  }
+
+  /* Build Sections */
+  .build-section {
+    padding: 14px;
+  }
+
+  .build-section h3 {
+    font-size: 0.9rem;
+  }
+
+  /* Toast Notifications */
+  .toast-notification {
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    padding: 12px 16px;
+    font-size: 0.9rem;
+  }
+}
+
+/* --- LANDSCAPE MOBILE --- */
+@media (max-height: 500px) and (orientation: landscape) {
+  body {
+    padding: 10px;
+  }
+
+  .container {
+    max-width: 100%;
+  }
+
+  .controls-bar {
+    padding: 10px 16px;
+  }
+
+  .tabs-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+}
+
+/* --- HIGH DPI SCREENS --- */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .rune-icon,
+  .build-item,
+  .summoner-icon,
+  .summoner-icon-small,
+  .item-icon,
+  .champ-btn img {
+    image-rendering: -webkit-optimize-contrast;
+  }
+}
+
+/* --- PRINT STYLES --- */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+
+  .controls-bar,
+  .tabs-nav,
+  .pagination,
+  .btn-refresh,
+  .btn-import,
+  .build-actions,
+  .toast-notification {
+    display: none !important;
+  }
+
+  .card {
+    box-shadow: none;
+    border: 1px solid #ccc;
+  }
+}
+
+/* --- REDUCED MOTION --- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- DARK MODE PREFERENCE (already Catppuccin Mocha) --- */
+@media (prefers-color-scheme: dark) {
+  /* Already using dark theme by default */
+}
+
+/* --- LIGHT MODE PREFERENCE (optional override) --- */
+@media (prefers-color-scheme: light) {
+  /* Could add light mode overrides here if needed */
+}

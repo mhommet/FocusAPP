@@ -1,0 +1,391 @@
+/* =============================================================================
+   CHANGELOG - GitHub Releases & Commits Live Display
+   ============================================================================= */
+
+/* --- CHANGELOG HEADER --- */
+.changelog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+
+.changelog-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.changelog-header h2 i {
+  color: var(--accent-color);
+}
+
+/* --- CHANGELOG CARD --- */
+.changelog-card {
+  padding: 24px;
+}
+
+/* --- CHANGELOG LIST --- */
+.changelog-list {
+  max-height: 600px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-right: 8px;
+  padding-bottom: 10px;
+}
+
+.changelog-list::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.changelog-list::-webkit-scrollbar-track {
+  background: rgba(205, 214, 244, 0.05);
+  border-radius: 3px;
+}
+
+.changelog-list::-webkit-scrollbar-thumb {
+  background: rgba(249, 226, 175, 0.3);
+  border-radius: 3px;
+}
+
+.changelog-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(249, 226, 175, 0.5);
+}
+
+/* --- LOADING STATE --- */
+.changelog-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.changelog-loading .spinner-ring {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(205, 214, 244, 0.1);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin-smooth 1s linear infinite;
+}
+
+/* --- SECTION DIVIDER --- */
+.changelog-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 12px 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.changelog-section-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, rgba(205, 214, 244, 0.2), transparent);
+}
+
+.changelog-section-title i {
+  color: var(--accent-color);
+}
+
+/* --- RELEASE ITEM (Style Glow + Thick Border) --- */
+.release-item {
+  /* Fond subtil */
+  background: linear-gradient(
+    135deg,
+    rgba(116, 199, 236, 0.1),
+    rgba(249, 226, 175, 0.05)
+  );
+
+  /* ✅ FIX : Bordure plus épaisse (2px) et visible */
+  border: 2px solid rgba(116, 199, 236, 0.4);
+
+  border-radius: 16px;
+  padding: 20px;
+  position: relative;
+
+  /* ✅ FIX : Overflow visible pour le contenu */
+  overflow: visible;
+
+  /* Transition fluide pour le glow */
+  transition: all 0.3s ease-in-out;
+
+  display: flex;
+  flex-direction: column;
+}
+
+/* ❌ Supprimé : Barre latérale gauche (::before) */
+/* .release-item::before { ... } */
+
+/* ✅ FIX : Hover Glow sur la bordure */
+.release-item:hover {
+  /* Plus de transform translateY/zoom */
+  transform: none;
+
+  /* Bordure devient brillante (accent color) */
+  border-color: var(--accent-color);
+
+  /* Glow externe cyan/mauve */
+  box-shadow:
+    0 0 15px rgba(116, 199, 236, 0.4),
+    0 0 30px rgba(116, 199, 236, 0.1) inset;
+}
+
+.release-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.release-tag {
+  background: linear-gradient(135deg, #74c7ec, #89dceb);
+  color: #11111b;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.release-date {
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.release-date i {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.release-title {
+  margin: 0 0 12px 0;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+/* --- RELEASE NOTES --- */
+.release-notes {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.7;
+  margin-bottom: 16px;
+
+  /* ✅ FIX : Hauteur auto pour tout afficher */
+  height: auto;
+  max-height: none;
+  overflow: visible;
+}
+
+.release-notes p {
+  margin: 0 0 12px 0;
+}
+.release-notes ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.release-notes li {
+  margin: 4px 0;
+  color: var(--text-primary);
+}
+
+.release-notes a {
+  color: #74c7ec;
+  text-decoration: none;
+}
+.release-notes a:hover {
+  text-decoration: underline;
+}
+
+.release-notes strong {
+  color: var(--text-primary);
+}
+
+.release-notes .release-subtitle {
+  color: var(--accent-color);
+  margin: 16px 0 8px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.release-notes .release-section {
+  color: var(--text-primary);
+  margin: 12px 0 6px 0;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.release-notes blockquote {
+  border-left: 3px solid var(--accent-color);
+  padding-left: 12px;
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.release-notes code {
+  background: rgba(205, 214, 244, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 0.85em;
+  color: #f9e2af;
+}
+
+.release-notes hr {
+  border: none;
+  border-top: 1px solid rgba(205, 214, 244, 0.2);
+  margin: 16px 0;
+}
+
+.release-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #74c7ec;
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+
+.release-link:hover {
+  color: var(--accent-color);
+  gap: 12px;
+}
+
+/* --- COMMIT ITEM --- */
+.commit-item {
+  padding: 14px 16px;
+  border-left: 3px solid rgba(249, 226, 175, 0.4);
+  background: rgba(17, 17, 27, 0.4);
+  border-radius: 0 10px 10px 0;
+  transition: all 0.2s ease;
+}
+
+.commit-item:hover {
+  background: rgba(249, 226, 175, 0.08);
+  border-left-color: var(--accent-color);
+}
+
+.commit-message {
+  margin: 0 0 8px 0;
+}
+
+.commit-message a {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  transition: color 0.2s ease;
+}
+.commit-message a:hover {
+  color: var(--accent-color);
+}
+
+.commit-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.commit-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #74c7ec;
+}
+.commit-author i {
+  font-size: 0.75rem;
+}
+
+.commit-date {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.commit-date i {
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+
+.commit-sha {
+  font-family: "Consolas", "Monaco", monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+.commit-sha:hover {
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+/* --- EMPTY/ERROR STATE --- */
+.changelog-empty,
+.changelog-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+.changelog-empty i {
+  font-size: 3rem;
+  margin-bottom: 16px;
+  opacity: 0.5;
+  color: var(--accent-color);
+}
+.changelog-error {
+  color: var(--danger-color);
+}
+.changelog-error i {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+/* --- RESPONSIVE --- */
+@media (max-width: 768px) {
+  .changelog-header,
+  .release-header,
+  .commit-meta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .changelog-header {
+    gap: 12px;
+  }
+  .changelog-list {
+    max-height: 500px;
+  }
+  .changelog-card,
+  .release-item {
+    padding: 16px;
+  }
+  .commit-meta {
+    gap: 6px;
+  }
+}

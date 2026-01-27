@@ -10,7 +10,8 @@
       "allow": [
         { "url": "https://api.hommet.ch/**" },
         { "url": "https://ddragon.leagueoflegends.com/**" },
-        { "url": "https://raw.communitydragon.org/**" }
+        { "url": "https://raw.communitydragon.org/**" },
+        { "url": "https://api.github.com/**" }
       ]
     }
   ]

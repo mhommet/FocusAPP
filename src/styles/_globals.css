@@ -1,0 +1,81 @@
+/* =============================================================================
+   GLOBALS - Root Variables, Base Styles, Scrollbar
+   ============================================================================= */
+
+:root {
+  /* Palette Catppuccin Mocha */
+  /* Base sombre (Crust -> Base) */
+  --bg-gradient-start: #11111b;
+  --bg-gradient-end: #1e1e2e;
+
+  /* Surface semi-transparente (Mantle avec opacite) */
+  --glass-bg: rgba(30, 30, 46, 0.7);
+  --glass-border: rgba(186, 194, 222, 0.1);
+
+  /* Textes */
+  --text-primary: #cdd6f4;
+  --text-secondary: #a6adc8;
+
+  /* Accents */
+  --accent-color: #f9e2af;
+  /* Yellow (remplace le Gold) */
+  --accent-hover: #fab387;
+  /* Peach (pour le survol) */
+
+  /* Status */
+  --danger-color: #f38ba8;
+  /* Red */
+  --success-color: #a6e3a1;
+  /* Green */
+}
+
+/* Scrollbar Hidden */
+* {
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE/Edge */
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  /* Chrome/Safari/Opera */
+}
+
+html,
+body {
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: linear-gradient(
+    135deg,
+    var(--bg-gradient-start),
+    var(--bg-gradient-end)
+  );
+  background-attachment: fixed;
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+
+.container {
+  width: 100%;
+  max-width: 1100px;
+  animation: fadeIn 0.8s ease-out;
+}
+
+/* Smooth transitions for all interactive elements */
+button,
+input,
+select,
+a,
+.clickable {
+  transition: all 0.2s ease;
+}

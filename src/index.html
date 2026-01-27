@@ -16,7 +16,14 @@
             <div class="header-title">
                 <h1>FOCUS <span id="version" class="version-badge">Loading...</span></h1>
             </div>
-            <!-- ✅ Plus de onclick -->
+            <!-- Global Champion Search -->
+            <div class="global-search-container">
+                <div class="global-search-wrapper">
+                    <i class="fas fa-search global-search-icon"></i>
+                    <input type="text" id="global-search" placeholder="Search champion... (Sion, Aatrox...)" autocomplete="off" spellcheck="false">
+                    <div id="global-search-results" class="global-search-dropdown"></div>
+                </div>
+            </div>
             <button id="refresh-btn" class="btn-refresh">
                 <i class="fas fa-sync-alt"></i> Actualiser
             </button>
@@ -33,6 +40,9 @@
             </button>
             <button class="tab-btn" data-tab="items">
                 <i class="fas fa-gem"></i> Items
+            </button>
+            <button class="tab-btn" data-tab="changelog">
+                <i class="fas fa-scroll"></i> Changelog
             </button>
         </nav>
 
@@ -255,6 +265,24 @@
                     <div id="items-pagination" class="pagination"></div>
                 </div>
             </main>
+        </div>
+
+        <!-- CHANGELOG TAB -->
+        <div id="changelog-tab" class="tab-content">
+            <div class="changelog-header">
+                <h2><i class="fas fa-scroll"></i> What's New</h2>
+                <button id="refresh-changelog" class="btn-refresh-small">
+                    <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+            </div>
+            <div class="card changelog-card">
+                <div id="changelog-list" class="changelog-list">
+                    <div class="changelog-loading">
+                        <div class="spinner-ring"></div>
+                        <span>Loading changelog...</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

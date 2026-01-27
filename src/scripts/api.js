@@ -23,6 +23,9 @@ const DDRAGON_BASE_URL = "https://ddragon.leagueoflegends.com";
 const DEFAULT_TIMEOUT = 30; // seconds
 const RETRY_COUNT = 3;
 
+// API Key for authenticated endpoints
+const API_KEY = "focusapp_prod_2026_x7k9p2m4q8v1n5r3";
+
 // Cache for DDragon version
 let cachedDDragonVersion = "14.10.1";
 
@@ -50,12 +53,16 @@ async function apiCall(endpoint, options = {}, retries = RETRY_COUNT) {
         headers: {
           "Content-Type": "application/json",
           Accept: "application/json",
+          "X-API-Key": API_KEY,
           ...options.headers,
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
+        if (response.status === 401) {
+          throw new Error("API Key invalid - check configuration");
+        }
         throw new Error(`API Error ${response.status}: ${errorText}`);
       }
 
@@ -853,8 +860,8 @@ const RUNE_PATHS = {
   8369: "perk-images/Styles/Inspiration/FirstStrike/FirstStrike.png",
   8306: "perk-images/Styles/Inspiration/HextechFlashtraption/HextechFlashtraption.png",
   8304: "perk-images/Styles/Inspiration/MagicalFootwear/MagicalFootwear.png",
-  8321: "http://wiki.leagueoflegends.com/en-us/images/Cash_Back_rune.png",
-  8313: "perk-images/Styles/Inspiration/TripleTonic/TripleTonic.png",
+  8321: "https://wiki.leagueoflegends.com/en-us/images/Cash_Back_rune.png",
+  8313: "https://wiki.leagueoflegends.com/en-us/images/Triple_Tonic_rune.png?42e4d",
   8352: "perk-images/Styles/Inspiration/TimeWarpTonic/TimeWarpTonic.png",
   8345: "perk-images/Styles/Inspiration/BiscuitDelivery/BiscuitDelivery.png",
   8347: "perk-images/Styles/Inspiration/CosmicInsight/CosmicInsight.png",
@@ -1075,5 +1082,5 @@ function getSpellName(spellId) {
  * Get application version.
  */
 export function getAppVersion() {
-  return "1.4.0";
+  return "1.5.0";
 }

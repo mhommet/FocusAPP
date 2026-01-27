@@ -1,0 +1,395 @@
+/* =============================================================================
+   LAYOUT - Header, Tabs, Controls Bar, Sections
+   ============================================================================= */
+
+/* --- HEADER --- */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 0 10px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -1px;
+  background: linear-gradient(to right, #f9e2af, #f5e0dc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* --- TABS NAVIGATION --- */
+.tabs-nav {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 0 10px;
+}
+
+.tab-btn {
+  background: rgba(205, 214, 244, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  padding: 12px 24px;
+  border-radius: 16px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.tab-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(249, 226, 175, 0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tab-btn:hover::before {
+  opacity: 1;
+}
+
+.tab-btn:hover {
+  background: rgba(205, 214, 244, 0.1);
+  color: var(--text-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.tab-btn:active {
+  transform: translateY(0);
+}
+
+.tab-btn.active {
+  background: rgba(249, 226, 175, 0.15);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* --- CONTROLS BAR --- */
+.controls-bar {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.control-group label {
+  font-size: 0.7rem;
+  color: var(--accent-color);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin-left: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.control-group label i {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.control-separator {
+  width: 1px;
+  height: 40px;
+  background: rgba(205, 214, 244, 0.1);
+  margin: 0 4px;
+}
+
+.search-group {
+  margin-left: auto;
+  position: relative;
+  flex: 1 1 200px;
+  max-width: 280px;
+  min-width: 150px;
+}
+
+.search-group input {
+  width: 100%;
+  min-width: unset;
+}
+
+.search-group input::placeholder {
+  color: rgba(205, 214, 244, 0.3);
+}
+
+/* --- ROLE FILTER BUTTONS --- */
+.role-filter-group {
+  flex-direction: row !important;
+}
+
+.role-filter-inline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.role-filter-btn-small {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(17, 17, 27, 0.6);
+  border: 1.5px solid rgba(205, 214, 244, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.role-filter-btn-small::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(249, 226, 175, 0.2), transparent);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.role-filter-btn-small:hover::before {
+  opacity: 1;
+}
+
+.role-filter-btn-small:hover {
+  background: rgba(205, 214, 244, 0.1);
+  border-color: rgba(249, 226, 175, 0.4);
+  transform: translateY(-2px);
+}
+
+.role-filter-btn-small.active {
+  background: rgba(249, 226, 175, 0.15);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  box-shadow: 0 0 10px rgba(249, 226, 175, 0.15);
+}
+
+.role-icon-small {
+  width: 20px;
+  height: 20px;
+  filter: brightness(0.7);
+  transition: filter 0.2s ease;
+}
+
+.role-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-cell .role-icon-small {
+  filter: brightness(1);
+  width: 18px;
+  height: 18px;
+}
+
+.role-filter-btn-small:hover .role-icon-small {
+  filter: brightness(1);
+}
+
+.role-filter-btn-small.active .role-icon-small {
+  filter: brightness(1) drop-shadow(0 0 3px rgba(249, 226, 175, 0.5));
+}
+
+.role-filter-btn-small i {
+  font-size: 0.9rem;
+}
+
+/* --- HINT GROUP --- */
+.hint-group {
+  flex-shrink: 0;
+}
+
+.click-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  opacity: 0.7;
+  padding: 6px 10px;
+  background: rgba(205, 214, 244, 0.05);
+  border-radius: 6px;
+  transition: opacity 0.2s ease;
+}
+
+.click-hint:hover {
+  opacity: 1;
+}
+
+.click-hint i {
+  color: var(--accent-color);
+  font-size: 0.7rem;
+}
+
+/* --- BACKEND STATUS BANNER --- */
+.backend-status-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, rgba(243, 139, 168, 0.2), rgba(243, 139, 168, 0.1));
+  border: 1px solid rgba(243, 139, 168, 0.5);
+  border-radius: 12px;
+  margin: 0 20px 16px 20px;
+  color: #f38ba8;
+  font-weight: 500;
+  animation: pulse-warning 2s ease-in-out infinite;
+}
+
+.backend-status-banner i {
+  font-size: 1.2rem;
+}
+
+.backend-status-banner span {
+  flex: 1;
+}
+
+/* --- BUILD SECTIONS GRID --- */
+.build-sections {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.build-column-group {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* --- ITEMS CONTROLS BAR (One Line) --- */
+.items-controls-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.search-group-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 12px;
+  border-radius: 8px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 250px;
+}
+
+.search-group-inline i {
+  color: var(--text-secondary);
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.search-input-inline {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 14px;
+  width: 100%;
+  padding: 4px 0;
+  min-width: 0;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.search-input-inline::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.filter-group-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.filter-group-inline label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.filter-group-inline label i {
+  font-size: 12px;
+}
+
+.filter-select-inline {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(205, 214, 244, 0.1);
+  color: var(--text-primary);
+  padding: 6px 28px 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 80px;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 12 12'%3E%3Cpath fill='%23f9e2af' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.filter-select-inline:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: var(--accent-color);
+}
+
+.filter-select-inline:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(249, 226, 175, 0.1);
+}
