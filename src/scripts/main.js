@@ -33,6 +33,9 @@ let tierListData = null;
 /** @type {Array<Object>} All items data */
 let allItems = [];
 
+/** @type {string} DDragon version for item images */
+let itemsVersion = "14.10.1";
+
 /** @type {Array<Object>} Filtered champions based on search/filters */
 let filteredChampions = [];
 
@@ -605,8 +608,9 @@ async function refreshItems() {
 
     const data = await getItemsData();
 
-    if (data && data.length > 0) {
-        allItems = data;
+    if (data && data.items && data.items.length > 0) {
+        allItems = data.items;
+        itemsVersion = data.version || itemsVersion;
         filterItems();
     } else {
         if (grid) grid.innerHTML = '<div class="loading-cell">Failed to load items</div>';
@@ -623,50 +627,63 @@ function filterItems(resetPage = true) {
     const searchText = document.getElementById('item-search').value.toLowerCase();
 
     filteredItems = allItems.filter((item) => {
-        const matchCategory = category === 'all' || item.category === category;
-        // Check against stat_types array (multiple stats per item) or fallback to stat_type
-        const matchStat =
-            statType === 'all' ||
-            (item.stat_types && item.stat_types.includes(statType)) ||
-            item.stat_type === statType;
+        // Category filter (basic/epic/legendary) - derive from gold_cost
+        let itemCategory = 'basic';
+        const goldCost = item.gold_cost || 0;
+        if (goldCost >= 2500) itemCategory = 'legendary';
+        else if (goldCost >= 1000) itemCategory = 'epic';
+        const matchCategory = category === 'all' || itemCategory === category;
+
+        // Stat filter - check tags from API
+        const matchStat = statType === 'all' || (item.tags && item.tags.some(tag => {
+            const tagLower = tag.toLowerCase();
+            if (statType === 'ad') return tagLower === 'damage';
+            if (statType === 'ap') return tagLower === 'spellblock' || tagLower === 'magicpenetration';
+            if (statType === 'health') return tagLower === 'health';
+            if (statType === 'armor') return tagLower === 'armor';
+            if (statType === 'mr') return tagLower === 'spellblock';
+            if (statType === 'as') return tagLower === 'attackspeed';
+            if (statType === 'crit') return tagLower === 'criticalstrike';
+            return false;
+        }));
+
         const matchSearch = item.name.toLowerCase().includes(searchText);
 
-        // Price filter
+        // Price filter - use gold_cost from API
         let matchPrice = true;
         if (priceRange !== 'all') {
-            const gold = item.gold || 0;
             switch (priceRange) {
                 case '0-1000':
-                    matchPrice = gold < 1000;
+                    matchPrice = goldCost < 1000;
                     break;
                 case '1000-2000':
-                    matchPrice = gold >= 1000 && gold < 2000;
+                    matchPrice = goldCost >= 1000 && goldCost < 2000;
                     break;
                 case '2000-3000':
-                    matchPrice = gold >= 2000 && gold < 3000;
+                    matchPrice = goldCost >= 2000 && goldCost < 3000;
                     break;
                 case '3000+':
-                    matchPrice = gold >= 3000;
+                    matchPrice = goldCost >= 3000;
                     break;
             }
         }
 
-        // Efficiency filter
+        // Efficiency filter - use gold_efficiency from API directly
         let matchEfficiency = true;
         if (efficiencyFilter !== 'all') {
-            const eff = item.efficiency;
+            const eff = item.gold_efficiency;
             if (eff === null || eff === undefined) {
-                matchEfficiency = false; // Hide items without efficiency when filtering
+                matchEfficiency = false;
             } else {
                 switch (efficiencyFilter) {
                     case 'high':
                         matchEfficiency = eff >= 100;
                         break;
                     case 'medium':
-                        matchEfficiency = eff >= 90 && eff < 100;
+                        matchEfficiency = eff >= 95 && eff < 100;
                         break;
                     case 'low':
-                        matchEfficiency = eff < 90;
+                        matchEfficiency = eff < 95;
                         break;
                 }
             }
@@ -729,30 +746,37 @@ function updateItemsGrid(items) {
 
     grid.innerHTML = items
         .map((item) => {
+            // Use gold_efficiency directly from API (e.g., 104.22 for Bastionbreaker)
+            const efficiencyValue = item.gold_efficiency;
+
             // Handle null efficiency (items without calculable stats)
             let efficiencyClass = 'efficiency-na';
             let efficiencyText = 'N/A';
 
-            if (item.efficiency !== null && item.efficiency !== undefined) {
-                efficiencyText = `${item.efficiency}%`;
-                if (item.efficiency >= 100) {
+            if (efficiencyValue !== null && efficiencyValue !== undefined) {
+                // Format with 1 decimal place (104.22 → "104.2%")
+                efficiencyText = `${parseFloat(efficiencyValue).toFixed(1)}%`;
+                if (efficiencyValue >= 100) {
                     efficiencyClass = 'efficiency-high';
-                } else if (item.efficiency >= 90) {
+                } else if (efficiencyValue >= 95) {
                     efficiencyClass = 'efficiency-medium';
                 } else {
                     efficiencyClass = 'efficiency-low';
                 }
             }
 
-            // Format raw stats if available, otherwise use plaintext
-            const statsDisplay = item.raw_stats ? formatRawStats(item.raw_stats) : item.stats || 'Passive effects';
+            // Format stats from API
+            const statsDisplay = item.stats ? formatRawStats(item.stats) : 'Passive effects';
+
+            // Generate image URL from item ID using API version
+            const imageUrl = `https://ddragon.leagueoflegends.com/cdn/${itemsVersion}/img/item/${item.id}.png`;
 
             return `
             <div class="item-card">
-                <img src="${item.image}" alt="${item.name}" class="item-icon" onerror="this.style.display='none'">
+                <img src="${imageUrl}" alt="${item.name}" class="item-icon" onerror="this.style.display='none'">
                 <div class="item-info">
                     <div class="item-name">${item.name}</div>
-                    <div class="item-gold"><i class="fas fa-coins"></i> ${item.gold} gold</div>
+                    <div class="item-gold"><i class="fas fa-coins"></i> ${item.gold_cost} gold</div>
                     <div class="item-stats">${statsDisplay || 'Passive effects'}</div>
                     <span class="item-efficiency ${efficiencyClass}">${efficiencyText} efficient</span>
                 </div>
@@ -2118,6 +2142,10 @@ function renderBuild(build) {
 
     // Update import button state based on League Client status
     updateImportButtonState();
+
+    // BUG FIX: Restore auto-import toggle state after re-rendering
+    // The toggle gets recreated in innerHTML, so we must restore its checked state
+    initAutoImport();
 }
 
 // =============================================================================

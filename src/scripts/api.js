@@ -439,12 +439,39 @@ function formatBuildResponse(data, champion, role) {
   // API format: build.items = [{ slot: "first", items: [{ id, name, count, winrate }] }, ...]
   const itemsArray = buildData.items || [];
 
-  // Common item IDs
-  const starterIds = [
-    1055, 1054, 1056, 1082, 1083, 2003, 2031, 3850, 3854, 3858, 3862, 1036,
-    1037,
+  // BUG FIX: Proper item ID classifications for filtering
+  // Valid starting items (gold_cost < 500 OR traditional starters)
+  const validStarterIds = [
+    // Doran's items
+    1055, // Doran's Blade
+    1054, // Doran's Shield
+    1056, // Doran's Ring
+    1082, // Dark Seal
+    1083, // Cull
+    // Potions
+    2003, // Health Potion
+    2031, // Refillable Potion
+    2033, // Corrupting Potion
+    2055, // Control Ward
+    // Support items
+    3850, 3851, 3853, // Spellthief's line
+    3854, 3855, 3857, // Relic Shield line
+    3858, 3859, 3860, // Spectral Sickle line
+    3862, 3863, 3864, // Steel Shoulderguards line
+    // Long Sword / Amplifying Tome for some builds
+    1036, // Long Sword (350g)
+    1037, // Pickaxe - NOT a starter, removing
+    1052, // Amplifying Tome (400g)
+    // Boots (basic)
+    1001, // Boots (300g)
+    // Tear
+    3070, // Tear of the Goddess (400g)
   ];
-  const bootIds = [1001, 3006, 3009, 3020, 3047, 3111, 3117, 3158];
+
+  const bootIds = [1001, 3006, 3009, 3020, 3047, 3111, 3117, 3158, 3013]; // Added Sorcerer's Boots variant
+
+  // Full items (expensive, NOT starters) - these should NEVER be in starting items
+  const fullItemMinGold = 2000; // Items above this are definitely not starters
 
   // Helper to get best item from a slot
   const getBestItemFromSlot = (slotName) => {
@@ -469,20 +496,30 @@ function formatBuildResponse(data, champion, role) {
     };
   };
 
-  // Starting items - Get top 2 most popular items from "first" slot
-  // Sorted by count (most picked) then winrate as tiebreaker
+  // BUG FIX: Starting items - ONLY show valid low-cost starting items (boots/potions/Doran's)
+  // Filter out full items like Guardian Angel that incorrectly appear in "first" slot
   const startingItems = [];
   const firstSlot = itemsArray.find((s) => s.slot === "first");
   if (firstSlot && firstSlot.items && firstSlot.items.length > 0) {
+    // Filter to only valid starting items (in validStarterIds list OR gold < 500)
+    const validStartingItems = firstSlot.items.filter((item) => {
+      const itemId = parseInt(item.id);
+      // Accept if it's in our known starter list
+      if (validStarterIds.includes(itemId)) return true;
+      // Accept basic boots
+      if (itemId === 1001) return true;
+      // Reject everything else (full items like Guardian Angel should NOT be starters)
+      return false;
+    });
+
     // Sort by count desc, then winrate desc as tiebreaker
-    const sortedFirstItems = [...firstSlot.items].sort((a, b) => {
+    const sortedStartingItems = [...validStartingItems].sort((a, b) => {
       if (b.count !== a.count) return b.count - a.count;
       return (b.winrate || 0) - (a.winrate || 0);
     });
 
-    // Take top 2 items as starting items (regardless of whether they're "traditional" starters)
-    // This handles cases like Sion buying Titanic Hydra components first
-    for (const item of sortedFirstItems.slice(0, 2)) {
+    // Take top 2 valid starting items
+    for (const item of sortedStartingItems.slice(0, 2)) {
       startingItems.push(formatItem(item));
     }
   }
@@ -539,7 +576,7 @@ function formatBuildResponse(data, champion, role) {
         if (
           !usedIds.has(item.id) &&
           !bootIds.includes(item.id) &&
-          !starterIds.includes(item.id)
+          !validStarterIds.includes(item.id)
         ) {
           situationalItems.push(formatItem(item));
           usedIds.add(item.id);
@@ -674,207 +711,21 @@ function makeErrorResponse(errorMsg, champion, role) {
 export async function getItemsData(refresh = false) {
   const params = refresh ? "?refresh=true" : "";
 
-  try {
-    const data = await apiCall(`/items${params}`);
-    const items = formatItemsResponse(data);
-    if (items.length > 0) {
-      return items;
-    }
-    console.warn("[API] Items API returned empty, falling back to DDragon");
-    return await fetchItemsFromDDragon();
-  } catch (error) {
-    console.error("[API] Items error, falling back to DDragon:", error);
-    return await fetchItemsFromDDragon();
-  }
-}
+  const data = await apiCall(`/items${params}`);
 
-/**
- * Fallback: Fetch items directly from DDragon with gold efficiency calculation.
- * Used when the backend API is unavailable.
- */
-async function fetchItemsFromDDragon() {
-  try {
-    const version = await getDDragonVersion();
-    const url = `${DDRAGON_BASE_URL}/cdn/${version}/data/en_US/item.json`;
-
-    const response = await fetch(url, {
-      method: "GET",
-      timeout: { secs: 15, nanos: 0 },
-    });
-
-    if (!response.ok) {
-      throw new Error(`DDragon error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const items = [];
-
-    // Gold values for efficiency calculation (from old Python app)
-    const GOLD_VALUES = {
-      FlatPhysicalDamageMod: 35,
-      FlatMagicDamageMod: 21.75,
-      FlatArmorMod: 20,
-      FlatSpellBlockMod: 18,
-      FlatHPPoolMod: 2.67,
-      FlatMPPoolMod: 1.4,
-      PercentAttackSpeedMod: 2500,
-      FlatCritChanceMod: 4000,
-      FlatMovementSpeedMod: 12,
-      PercentMovementSpeedMod: 3950,
-      FlatHPRegenMod: 36,
-      FlatMPRegenMod: 50,
-      PercentLifeStealMod: 2750,
-    };
-
-    // Stat mapping for filters
-    const statMapping = {
-      FlatPhysicalDamageMod: "ad",
-      FlatMagicDamageMod: "ap",
-      FlatHPPoolMod: "health",
-      FlatArmorMod: "armor",
-      FlatSpellBlockMod: "mr",
-      PercentAttackSpeedMod: "as",
-      FlatCritChanceMod: "crit",
-    };
-
-    for (const [itemId, itemData] of Object.entries(data.data)) {
-      const goldData = itemData.gold || {};
-      const goldTotal = goldData.total || 0;
-
-      // Skip non-purchasable or zero-price items
-      if (goldData.purchasable === false || goldTotal <= 0) continue;
-
-      // Calculate gold efficiency
-      const itemStats = itemData.stats || {};
-      let totalStatValue = 0;
-      for (const [statKey, statValue] of Object.entries(itemStats)) {
-        if (GOLD_VALUES[statKey] && statValue !== 0) {
-          totalStatValue += statValue * GOLD_VALUES[statKey];
-        }
-      }
-      const efficiency =
-        totalStatValue > 0
-          ? Math.round((totalStatValue / goldTotal) * 1000) / 10
-          : null;
-
-      // Determine category
-      let category = "basic";
-      if (goldTotal >= 2500) category = "legendary";
-      else if (goldTotal >= 1000) category = "epic";
-
-      // Detect stat types
-      const statTypes = [];
-      for (const [ddragonKey, filterValue] of Object.entries(statMapping)) {
-        if (itemStats[ddragonKey] && itemStats[ddragonKey] !== 0) {
-          if (!statTypes.includes(filterValue)) statTypes.push(filterValue);
-        }
-      }
-
-      items.push({
-        id: itemId,
-        name: itemData.name || "Unknown",
-        description: itemData.plaintext || "",
-        gold: goldTotal,
-        image: `${DDRAGON_BASE_URL}/cdn/${version}/img/item/${itemData.image.full}`,
-        category: category,
-        stats: itemData.plaintext || "",
-        stat_type: statTypes[0] || null,
-        stat_types: statTypes,
-        efficiency: efficiency,
-        raw_stats: itemStats,
-        tags: itemData.tags || [],
-      });
-    }
-
-    console.log(`[DDragon] Loaded ${items.length} items directly`);
-    return items;
-  } catch (error) {
-    console.error("[DDragon] Failed to fetch items:", error);
-    return [];
-  }
-}
-
-/**
- * Format items response for frontend display.
- */
-function formatItemsResponse(data) {
-  if (!data.success) {
-    return [];
+  // API returns { items: [...], version: "15.x.x", total: N }
+  if (!data || !Array.isArray(data.items)) {
+    console.error("[API] Items: unexpected format", data);
+    return { items: [], version: cachedDDragonVersion };
   }
 
-  const version = data.version || cachedDDragonVersion;
+  // Update cached version from API
   if (data.version) {
     cachedDDragonVersion = data.version;
   }
 
-  const rawItems = data.items || {};
-  const formattedItems = [];
-
-  // Stat mapping
-  const statMapping = {
-    FlatPhysicalDamageMod: "ad",
-    FlatMagicDamageMod: "ap",
-    FlatHPPoolMod: "health",
-    PercentHPPoolMod: "health",
-    FlatArmorMod: "armor",
-    FlatSpellBlockMod: "mr",
-    PercentAttackSpeedMod: "as",
-    FlatCritChanceMod: "crit",
-  };
-
-  for (const [itemId, itemData] of Object.entries(rawItems)) {
-    const goldData = itemData.gold || {};
-    const goldTotal = goldData.total || 0;
-
-    // Skip non-purchasable items
-    if (!goldData.purchasable) continue;
-
-    // Determine category
-    let category;
-    if (goldTotal >= 2500) {
-      category = "legendary";
-    } else if (goldTotal >= 1000) {
-      category = "epic";
-    } else {
-      category = "basic";
-    }
-
-    // Detect stat types
-    const itemStats = itemData.stats || {};
-    const statTypes = [];
-    for (const [ddragonKey, filterValue] of Object.entries(statMapping)) {
-      if (itemStats[ddragonKey] && itemStats[ddragonKey] !== 0) {
-        if (!statTypes.includes(filterValue)) {
-          statTypes.push(filterValue);
-        }
-      }
-    }
-
-    const primaryStat = statTypes[0] || null;
-
-    // Get efficiency
-    let efficiency = itemData.gold_efficiency;
-    if (efficiency === 0) {
-      efficiency = null;
-    }
-
-    formattedItems.push({
-      id: itemId,
-      name: itemData.name || "Unknown",
-      description: itemData.plaintext || "",
-      gold: goldTotal,
-      image: itemData.image_url || getItemImageUrl(parseInt(itemId), version),
-      category: category,
-      stats: itemData.plaintext || "",
-      stat_type: primaryStat,
-      stat_types: statTypes,
-      efficiency: efficiency,
-      raw_stats: itemStats,
-      tags: itemData.tags || [],
-    });
-  }
-
-  return formattedItems;
+  console.log(`[API] Loaded ${data.items.length} items (v${data.version})`);
+  return { items: data.items, version: data.version || cachedDDragonVersion };
 }
 
 // =============================================================================

@@ -577,19 +577,28 @@ tbody tr:last-child td {
   margin-top: 8px;
 }
 
+/* BUG FIX: Gold efficiency styling with glow effects */
+/* High efficiency (≥100%) - Green with glow */
 .efficiency-high {
-  background: rgba(166, 227, 161, 0.2);
+  background: rgba(166, 227, 161, 0.25);
   color: var(--success-color);
+  box-shadow: 0 0 8px rgba(166, 227, 161, 0.4);
+  border: 1px solid rgba(166, 227, 161, 0.3);
 }
 
+/* Medium efficiency (95-99%) - Orange/Yellow with subtle glow */
 .efficiency-medium {
-  background: rgba(249, 226, 175, 0.2);
+  background: rgba(249, 226, 175, 0.25);
   color: var(--accent-color);
+  box-shadow: 0 0 6px rgba(249, 226, 175, 0.3);
+  border: 1px solid rgba(249, 226, 175, 0.3);
 }
 
+/* Low efficiency (<95%) - Red, no glow */
 .efficiency-low {
   background: rgba(243, 139, 168, 0.2);
   color: var(--danger-color);
+  border: 1px solid rgba(243, 139, 168, 0.2);
 }
 
 .efficiency-na {
@@ -761,7 +770,7 @@ tbody tr:last-child td {
   position: relative;
   width: 36px;
   height: 20px;
-  background: var(--surface-2);
+  background: rgba(108, 112, 134, 0.5); /* Fixed: was var(--surface-2) which may not be defined */
   border-radius: 10px;
   transition: background 0.2s ease;
 }
@@ -784,7 +793,7 @@ tbody tr:last-child td {
 
 .auto-import-label input:checked + .toggle-slider::after {
   transform: translateX(16px);
-  background: var(--bg-primary);
+  background: #11111b; /* Fixed: was var(--bg-primary) which may not be defined */
 }
 
 .toggle-text {
