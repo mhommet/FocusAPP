@@ -1536,22 +1536,28 @@ async function updateImportButtonState() {
  * @param {boolean} enabled - Whether to enable auto-import
  */
 function toggleAutoImport(enabled) {
+    console.log(`[AutoImport] toggleAutoImport called with: ${enabled}`);
     autoImportEnabled = enabled;
-    console.log(`[AutoImport] ${enabled ? 'Enabled' : 'Disabled'}`);
 
     // Save preference to localStorage
     localStorage.setItem('focusapp_autoimport', enabled ? 'true' : 'false');
+    console.log(`[AutoImport] Saved to localStorage: ${enabled}`);
 
     // Update UI toggle state
     const toggle = document.getElementById('auto-import-toggle');
+    console.log(`[AutoImport] Toggle element:`, toggle);
     if (toggle) {
         toggle.checked = enabled;
     }
 
     const statusEl = document.getElementById('auto-import-status');
+    console.log(`[AutoImport] Status element:`, statusEl);
     if (statusEl) {
         statusEl.textContent = enabled ? 'ON' : 'OFF';
         statusEl.className = `auto-import-status ${enabled ? 'status-on' : 'status-off'}`;
+        console.log(`[AutoImport] Status updated to: ${enabled ? 'ON' : 'OFF'}`);
+    } else {
+        console.warn(`[AutoImport] Status element not found!`);
     }
 
     if (enabled) {

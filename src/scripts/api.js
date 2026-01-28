@@ -195,6 +195,47 @@ export async function getTierlist(role = null) {
 }
 
 /**
+ * Format champion name from API format to display format.
+ * Handles special cases like "jarvaniv" -> "Jarvan IV", "leesin" -> "Lee Sin"
+ *
+ * @param {string} name - Normalized champion name from API
+ * @returns {string} Properly formatted champion name
+ */
+function formatChampionName(name) {
+  const specialNames = {
+    'jarvaniv': 'Jarvan IV',
+    'leesin': 'Lee Sin',
+    'masteryi': 'Master Yi',
+    'missfortune': 'Miss Fortune',
+    'twistedfate': 'Twisted Fate',
+    'drmundo': 'Dr. Mundo',
+    'tahmkench': 'Tahm Kench',
+    'aurelionsol': 'Aurelion Sol',
+    'reksai': "Rek'Sai",
+    'khazix': "Kha'Zix",
+    'chogath': "Cho'Gath",
+    'kogmaw': "Kog'Maw",
+    'velkoz': "Vel'Koz",
+    'kaisa': "Kai'Sa",
+    'belveth': "Bel'Veth",
+    'ksante': "K'Sante",
+    'xinzhao': 'Xin Zhao',
+    'monkeyking': 'Wukong',
+    'wukong': 'Wukong',
+    'nunuwillump': 'Nunu & Willump',
+    'nunu': 'Nunu & Willump',
+    'renataglasc': 'Renata Glasc',
+    'renata': 'Renata Glasc',
+  };
+
+  const normalized = name.toLowerCase().replace(/[^a-z]/g, '');
+  if (specialNames[normalized]) {
+    return specialNames[normalized];
+  }
+  return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+/**
  * Format tier list response for frontend display.
  *
  * @param {Object} data - Raw API response
@@ -245,7 +286,7 @@ function formatTierlistResponse(data, filteredRole = null) {
 
       const formattedEntry = {
         champion: championName,
-        name: championName.charAt(0).toUpperCase() + championName.slice(1),
+        name: formatChampionName(championName),
         tier: tier,
         winrate: winrate,
         winrate_str: winrateStr,
@@ -311,7 +352,12 @@ export async function getChampionBuild(
     .replace(/'/g, "")
     .replace(/\./g, "");
 
-  const roleNormalized = role.toLowerCase();
+  // Normalize role - API expects 'bottom' not 'adc'
+  let roleNormalized = role.toLowerCase();
+  if (roleNormalized === "adc") {
+    roleNormalized = "bottom";
+  }
+
   const params = forceRefresh ? "?force_refresh=true" : "";
 
   try {
@@ -874,7 +920,7 @@ const RUNE_PATHS = {
   8345: "perk-images/Styles/Inspiration/BiscuitDelivery/BiscuitDelivery.png",
   8347: "perk-images/Styles/Inspiration/CosmicInsight/CosmicInsight.png",
   8410: "https://wiki.leagueoflegends.com/en-us/images/Approach_Velocity_rune.png",
-  8316: "perk-images/Styles/Inspiration/JackOfAllTrades/JackOfAllTrades.png",
+  8316: "https://wiki.leagueoflegends.com/en-us/images/Jack_of_All_Trades_rune.png",
 
   // Stat Shards
   5008: "perk-images/StatMods/StatModsAdaptiveForceIcon.png",
