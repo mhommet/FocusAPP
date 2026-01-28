@@ -28,6 +28,7 @@
 
 mod champions;
 mod lcu;
+mod overlay;
 
 use lcu::{
     add_item_set, create_rune_page, find_lockfile, get_champion_select_session,
@@ -326,7 +327,13 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             import_build_to_client,
             is_league_client_running,
-            get_champion_select_session_cmd
+            get_champion_select_session_cmd,
+            // CS Overlay commands
+            overlay::is_game_active,
+            overlay::get_live_cs_stats,
+            overlay::show_cs_overlay,
+            overlay::hide_cs_overlay,
+            overlay::set_overlay_click_through
         ])
         .setup(|_app| {
             #[cfg(debug_assertions)]

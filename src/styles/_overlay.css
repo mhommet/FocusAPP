@@ -1,0 +1,157 @@
+/* =============================================================================
+   CS OVERLAY CONTROLS
+   =============================================================================
+   Styles pour les controles de l'overlay CS dans l'interface principale.
+   ============================================================================= */
+
+/* Conteneur des controles overlay */
+.cs-overlay-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cs-overlay-controls label {
+    font-size: 0.75rem;
+    color: var(--subtext0);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cs-overlay-controls label i {
+    color: var(--mauve);
+}
+
+/* Groupe de controles */
+.overlay-toggle-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Bouton toggle overlay */
+.overlay-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.overlay-toggle-btn:hover {
+    background: var(--surface1);
+    border-color: var(--surface2);
+}
+
+.overlay-toggle-btn.active {
+    background: rgba(166, 227, 161, 0.15);
+    border-color: var(--green);
+    color: var(--green);
+}
+
+.overlay-toggle-btn.active i {
+    color: var(--green);
+}
+
+.overlay-toggle-btn i {
+    font-size: 0.85rem;
+    color: var(--subtext0);
+    transition: color 0.2s ease;
+}
+
+/* Selects de configuration */
+.overlay-select {
+    padding: 6px 10px;
+    background: var(--surface0);
+    border: 1px solid var(--surface1);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 90px;
+}
+
+.overlay-select:hover {
+    background: var(--surface1);
+    border-color: var(--surface2);
+}
+
+.overlay-select:focus {
+    outline: none;
+    border-color: var(--mauve);
+    box-shadow: 0 0 0 2px rgba(203, 166, 247, 0.2);
+}
+
+.overlay-select option {
+    background: var(--base);
+    color: var(--text);
+}
+
+/* Diamond+ info badge */
+.overlay-info {
+    padding: 4px 10px;
+    background: rgba(203, 166, 247, 0.15);
+    border: 1px solid var(--mauve);
+    border-radius: 4px;
+    color: var(--mauve);
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+}
+
+/* Status indicator */
+.overlay-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--subtext0);
+}
+
+.overlay-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--surface2);
+}
+
+.overlay-status-dot.active {
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(166, 227, 161, 0.5);
+    animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.overlay-status-dot.waiting {
+    background: var(--yellow);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+    .overlay-toggle-group {
+        flex-wrap: wrap;
+    }
+
+    .overlay-select {
+        min-width: 80px;
+    }
+}
+
+@media (max-width: 900px) {
+    .cs-overlay-controls {
+        display: none; /* Hide on mobile */
+    }
+}

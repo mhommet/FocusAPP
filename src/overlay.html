@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CS Overlay</title>
+    <style>
+        /*
+         * OVERLAY CS/MIN - STYLE MINIMALISTE
+         * ==================================
+         * Design: Fenetre compacte, semi-transparente, haute lisibilite
+         *
+         * CONFORMITE RIOT GAMES:
+         * Cet overlay est purement informatif et n'interagit pas avec le jeu.
+         */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            background: transparent;
+            overflow: hidden;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .overlay-container {
+            width: 200px;
+            padding: 12px 16px;
+            background: rgba(15, 15, 20, 0.92);
+            border: 1px solid rgba(200, 170, 110, 0.5);
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Zone de drag pour deplacer la fenetre */
+        .drag-handle {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 24px;
+            cursor: move;
+            -webkit-app-region: drag;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 8px;
+        }
+
+        .stat-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.55);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #ffffff;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stat-value.cs-per-min {
+            font-size: 26px;
+            font-weight: 700;
+            color: #c8aa6e; /* Or League of Legends */
+        }
+
+        .stat-value.delta {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .delta-excellent { color: #22c55e; }
+        .delta-good { color: #84cc16; }
+        .delta-warning { color: #eab308; }
+        .delta-danger { color: #f97316; }
+        .delta-critical { color: #ef4444; }
+
+        .target-info {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.4);
+            margin-top: 10px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        /* Etat: En attente de partie */
+        .waiting-state {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .waiting-state .icon {
+            font-size: 28px;
+            margin-bottom: 10px;
+            opacity: 0.4;
+        }
+
+        .waiting-state .text {
+            font-size: 11px;
+            color: rgba(255, 255, 255, 0.45);
+            line-height: 1.4;
+        }
+
+        /* Animation pulse pour mise a jour */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .updating {
+            animation: pulse 0.4s ease-in-out;
+        }
+
+        /* Animation de chargement */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(200, 170, 110, 0.3);
+            border-top-color: #c8aa6e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        /* Game time display */
+        .game-time {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.35);
+            text-align: center;
+            margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="drag-handle"></div>
+
+    <div class="overlay-container" id="overlay">
+        <!-- Etat: En attente -->
+        <div id="waiting-state" class="waiting-state">
+            <div class="icon">&#9203;</div>
+            <div class="text">En attente<br>d'une partie...</div>
+        </div>
+
+        <!-- Etat: Chargement -->
+        <div id="loading-state" class="waiting-state" style="display: none;">
+            <div class="loading-spinner"></div>
+            <div class="text">Connexion...</div>
+        </div>
+
+        <!-- Etat: En jeu -->
+        <div id="game-state" style="display: none;">
+            <div class="stat-row">
+                <span class="stat-label">CS</span>
+                <span class="stat-value" id="cs-value">0</span>
+            </div>
+
+            <div class="stat-row">
+                <span class="stat-label">CS/min</span>
+                <span class="stat-value cs-per-min" id="cspm-value">0.0</span>
+            </div>
+
+            <div class="stat-row">
+                <span class="stat-label">vs Cible</span>
+                <span class="stat-value delta" id="delta-value">+0.0</span>
+            </div>
+
+            <div class="target-info" id="target-info">
+                Cible: 7.0 CS/min (Mid - Platinum)
+            </div>
+
+            <div class="game-time" id="game-time">00:00</div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * OVERLAY CS/MIN - LOGIQUE FRONTEND
+         * =================================
+         *
+         * RAPPEL DE CONFORMITE RIOT GAMES:
+         * --------------------------------
+         * Cette fenetre est un simple affichage de donnees en lecture seule.
+         * Elle ne capture aucun input et n'interagit pas avec le jeu.
+         *
+         * Les donnees proviennent de:
+         * 1. Live Client Data API (port 2999) - API officielle Riot
+         * 2. FocusApi /benchmarks/cs - Donnees publiques agregees
+         *
+         * Aucune modification du gameplay, aucun avantage deloyal.
+         */
+
+        // Elements DOM
+        const elements = {
+            overlay: document.getElementById('overlay'),
+            waitingState: document.getElementById('waiting-state'),
+            loadingState: document.getElementById('loading-state'),
+            gameState: document.getElementById('game-state'),
+            csValue: document.getElementById('cs-value'),
+            cspmValue: document.getElementById('cspm-value'),
+            deltaValue: document.getElementById('delta-value'),
+            targetInfo: document.getElementById('target-info'),
+            gameTime: document.getElementById('game-time'),
+        };
+
+        // Configuration - Hardcoded to Diamond for all users
+        // Role is auto-detected from LCU champion select
+        let currentRole = localStorage.getItem('cs-overlay-role') || 'mid';
+        const currentRank = 'diamond'; // Hardcoded - Diamond+ benchmarks only
+
+        /**
+         * Formate le temps de jeu en MM:SS
+         */
+        function formatGameTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        /**
+         * Determine la classe CSS pour le delta
+         */
+        function getDeltaClass(delta) {
+            if (delta >= 0.5) return 'delta-excellent';
+            if (delta >= 0) return 'delta-good';
+            if (delta >= -0.5) return 'delta-warning';
+            if (delta >= -1.0) return 'delta-danger';
+            return 'delta-critical';
+        }
+
+        /**
+         * Met a jour l'affichage avec les nouvelles stats
+         */
+        function updateDisplay(stats) {
+            // Afficher l'etat de jeu
+            elements.waitingState.style.display = 'none';
+            elements.loadingState.style.display = 'none';
+            elements.gameState.style.display = 'block';
+
+            // Mettre a jour les valeurs avec animation
+            updateValueWithAnimation(elements.csValue, stats.currentCs);
+            updateValueWithAnimation(elements.cspmValue, stats.csPerMinute.toFixed(1));
+
+            // Delta avec signe et couleur
+            const delta = stats.delta || 0;
+            const deltaText = delta >= 0 ? `+${delta.toFixed(1)}` : delta.toFixed(1);
+            elements.deltaValue.textContent = deltaText;
+
+            // Supprimer toutes les classes delta et ajouter la bonne
+            elements.deltaValue.className = 'stat-value delta ' + getDeltaClass(delta);
+
+            // Info cible
+            const roleDisplay = (stats.role || currentRole).charAt(0).toUpperCase() +
+                               (stats.role || currentRole).slice(1);
+            const rankDisplay = (stats.rank || currentRank).charAt(0).toUpperCase() +
+                               (stats.rank || currentRank).slice(1);
+            const targetCspm = stats.targetCsPerMinute || 7.0;
+            elements.targetInfo.textContent = `Cible: ${targetCspm.toFixed(1)} CS/min (${roleDisplay} - ${rankDisplay})`;
+
+            // Temps de jeu
+            elements.gameTime.textContent = formatGameTime(stats.gameTimeSeconds || 0);
+        }
+
+        /**
+         * Anime la mise a jour d'une valeur
+         */
+        function updateValueWithAnimation(element, newValue) {
+            const newValueStr = String(newValue);
+            if (element.textContent !== newValueStr) {
+                element.textContent = newValueStr;
+                element.classList.add('updating');
+                setTimeout(() => element.classList.remove('updating'), 400);
+            }
+        }
+
+        /**
+         * Affiche l'etat d'attente
+         */
+        function showWaitingState() {
+            elements.waitingState.style.display = 'block';
+            elements.loadingState.style.display = 'none';
+            elements.gameState.style.display = 'none';
+        }
+
+        /**
+         * Affiche l'etat de chargement
+         */
+        function showLoadingState() {
+            elements.waitingState.style.display = 'none';
+            elements.loadingState.style.display = 'block';
+            elements.gameState.style.display = 'none';
+        }
+
+        /**
+         * Ecoute les evenements Tauri pour les mises a jour
+         */
+        async function setupEventListeners() {
+            try {
+                const { listen } = window.__TAURI__.event;
+
+                // Ecouter les mises a jour de stats CS
+                await listen('cs-overlay-update', (event) => {
+                    console.log('[Overlay] Stats update received:', event.payload);
+                    updateDisplay(event.payload);
+                });
+
+                // Ecouter les changements de configuration (role only - rank is hardcoded to Diamond)
+                await listen('cs-overlay-config', (event) => {
+                    console.log('[Overlay] Config update:', event.payload);
+                    if (event.payload.role) {
+                        currentRole = event.payload.role;
+                        localStorage.setItem('cs-overlay-role', currentRole);
+                    }
+                    // Rank is hardcoded to 'diamond' - ignore any rank changes
+                });
+
+                // Ecouter les changements d'etat
+                await listen('cs-overlay-state', (event) => {
+                    console.log('[Overlay] State change:', event.payload);
+                    switch (event.payload.state) {
+                        case 'waiting':
+                            showWaitingState();
+                            break;
+                        case 'loading':
+                            showLoadingState();
+                            break;
+                        case 'active':
+                            // Le gameState sera affiche par updateDisplay
+                            break;
+                    }
+                });
+
+                console.log('[Overlay] Event listeners registered');
+            } catch (error) {
+                console.error('[Overlay] Failed to setup event listeners:', error);
+            }
+        }
+
+        /**
+         * Initialisation
+         */
+        async function init() {
+            console.log('[Overlay] Initializing...');
+
+            // Attendre que Tauri soit pret
+            if (window.__TAURI__) {
+                await setupEventListeners();
+            } else {
+                // Fallback: attendre un peu et reessayer
+                setTimeout(async () => {
+                    if (window.__TAURI__) {
+                        await setupEventListeners();
+                    } else {
+                        console.error('[Overlay] Tauri not available');
+                    }
+                }, 500);
+            }
+
+            console.log('[Overlay] Initialized with role:', currentRole, 'rank:', currentRank);
+        }
+
+        // Demarrer
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
