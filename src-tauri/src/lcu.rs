@@ -133,6 +133,14 @@ pub struct ItemSetItem {
     pub count: i32,
 }
 
+/// Summoner spells payload from FocusApi (matches LCU format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SummonerSpellsPayload {
+    pub spell1_id: i32,
+    pub spell2_id: i32,
+}
+
 /// Response from FocusApi /lol/import-payload endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ImportPayloadResponse {
@@ -140,6 +148,7 @@ pub struct ImportPayloadResponse {
     pub role: Option<String>,
     pub rune_page_payload: Option<RunePagePayload>,
     pub item_set_payload: Option<ItemSetPayload>,
+    pub summoner_spells_payload: Option<SummonerSpellsPayload>,
 }
 
 /// Existing rune page from the client (for listing/deletion)
@@ -160,6 +169,7 @@ pub struct ImportResult {
     pub success: bool,
     pub runes_imported: bool,
     pub items_imported: bool,
+    pub summoners_imported: bool,
     pub message: String,
 }
 
@@ -346,6 +356,52 @@ pub async fn create_rune_page(
 
     Err(LcuError::ApiError(format!(
         "Failed to create rune page: {} - {}",
+        status, body
+    )))
+}
+
+/// Set summoner spells during champion select
+///
+/// This only works when the player is in champion select.
+/// Uses PATCH /lol-champ-select/v1/session/my-selection
+pub async fn set_summoner_spells(
+    connection: &LcuConnection,
+    payload: &SummonerSpellsPayload,
+) -> Result<(), LcuError> {
+    let client = create_lcu_client()?;
+    let url = format!(
+        "{}/lol-champ-select/v1/session/my-selection",
+        connection.base_url()
+    );
+
+    #[cfg(debug_assertions)]
+    eprintln!("[set_summoner_spells] PATCH {} with {:?}", url, payload);
+
+    let response = client
+        .patch(&url)
+        .header("Authorization", connection.auth_header())
+        .header("Content-Type", "application/json")
+        .json(payload)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        return Ok(());
+    }
+
+    let status = response.status();
+    let body = response.text().await.unwrap_or_default();
+
+    // 404 means not in champion select - this is expected outside of champ select
+    if status.as_u16() == 404 {
+        return Err(LcuError::ApiError(
+            "Not in champion select - summoner spells can only be changed during champ select"
+                .to_string(),
+        ));
+    }
+
+    Err(LcuError::ApiError(format!(
+        "Failed to set summoner spells: {} - {}",
         status, body
     )))
 }

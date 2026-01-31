@@ -1317,31 +1317,43 @@ async function importBuildToClient() {
         console.log('[Import] Payload built:', JSON.stringify(payload, null, 2));
 
         // Call the Tauri command (single request, no loops)
-        console.log('[Import] Calling Tauri command import_build_to_client...');
+        const startTime = performance.now();
+        console.log('[Import] ====== REQUEST SENT ======');
+        console.log('[Import] Timestamp:', new Date().toISOString());
+        console.log('[Import] Calling Tauri command: import_build_to_client');
+        console.log('[Import] Payload rune_shards:', payload.rune_shards);
+
         const result = await window.__TAURI__.core.invoke('import_build_to_client', {
             payload: payload
         });
 
-        console.log('[Import] Result:', result);
+        const duration = (performance.now() - startTime).toFixed(2);
+        console.log('[Import] ====== RESPONSE RECEIVED ======');
+        console.log('[Import] Timestamp:', new Date().toISOString());
+        console.log('[Import] Duration:', duration, 'ms');
+        console.log('[Import] Result:', JSON.stringify(result, null, 2));
 
         // Show appropriate feedback based on result
         if (result.success) {
-            let message = 'Build imported successfully!';
-            if (result.runes_imported && result.items_imported) {
-                message = 'Runes and items imported!';
-            } else if (result.runes_imported) {
-                message = 'Rune page imported!';
-            } else if (result.items_imported) {
-                message = 'Item set imported!';
-            }
+            const parts = [];
+            if (result.runes_imported) parts.push('Runes');
+            if (result.items_imported) parts.push('Items');
+            if (result.summoners_imported) parts.push('Summoners');
+
+            const message = parts.length > 0
+                ? `${parts.join(', ')} imported!`
+                : 'Build imported successfully!';
             showToast(message, 'success');
         } else {
             showToast(result.message || 'Import failed', 'error');
         }
 
     } catch (error) {
+        console.error('[Import] ====== REQUEST FAILED ======');
+        console.error('[Import] Timestamp:', new Date().toISOString());
         console.error('[Import] Error caught:', error);
         console.error('[Import] Error type:', typeof error);
+        console.error('[Import] Error stringified:', JSON.stringify(error, null, 2));
         console.error('[Import] Error keys:', error ? Object.keys(error) : 'null');
 
         // Handle specific error codes from the Tauri command
@@ -1372,6 +1384,48 @@ async function importBuildToClient() {
             importBtn.disabled = false;
             importBtn.innerHTML = '<i class="fas fa-download"></i> Import to LoL';
         }
+    }
+}
+
+/**
+ * Swap the order of summoner spells (D ↔ F).
+ * Updates currentBuild, re-renders the build display, and imports to client.
+ */
+async function swapSummoners() {
+    if (!currentBuild || !currentBuild.summoners || currentBuild.summoners.length !== 2) {
+        console.log('[Summoners] Cannot swap - need exactly 2 summoner spells');
+        return;
+    }
+
+    // Swap the summoners
+    const [spell1, spell2] = currentBuild.summoners;
+    currentBuild.summoners = [spell2, spell1];
+
+    console.log('[Summoners] Swapped:', spell1.name, '↔', spell2.name);
+
+    // Re-render the build to update the UI
+    renderBuild(currentBuild);
+
+    // Import swapped summoners to League Client
+    if (window.__TAURI__?.core?.invoke) {
+        try {
+            const newSpell1Id = currentBuild.summoners[0].id;
+            const newSpell2Id = currentBuild.summoners[1].id;
+
+            console.log('[Summoners] Importing to client:', newSpell1Id, newSpell2Id);
+
+            await window.__TAURI__.core.invoke('set_summoner_spells_cmd', {
+                spell1Id: newSpell1Id,
+                spell2Id: newSpell2Id
+            });
+
+            showToast('Summoners swapped & imported!', 'success');
+        } catch (error) {
+            console.log('[Summoners] Could not import to client:', error);
+            showToast('Summoners swapped!', 'success');
+        }
+    } else {
+        showToast('Summoners swapped!', 'success');
     }
 }
 
@@ -1413,12 +1467,20 @@ function buildImportPayload(build) {
         .map(r => r.id || r)
         .filter(id => id);
 
-    // Extract stat shards (3 shards)
-    const runeShards = (build.runes?.shards || build.stat_shards || [])
+    // Extract stat shards (must be exactly 3: Offense, Flex, Defense)
+    // Fallback IDs: 5008 = Adaptive Force, 5002 = Armor
+    const defaultShards = [5008, 5008, 5002];
+    const extractedShards = (build.runes?.shards || build.stat_shards || [])
         .map(s => s.id || s)
         .filter(id => id);
+    // Ensure exactly 3 shards by padding with defaults if needed
+    const runeShards = [
+        extractedShards[0] || defaultShards[0],
+        extractedShards[1] || defaultShards[1],
+        extractedShards[2] || defaultShards[2]
+    ];
 
-    // Extract item IDs
+    // Extract item IDs with deduplication
     const itemsStarting = (build.items?.starting || [])
         .map(i => parseInt(i.id || i, 10))
         .filter(id => !isNaN(id));
@@ -1427,12 +1489,15 @@ function buildImportPayload(build) {
         .map(i => parseInt(i.id || i, 10))
         .filter(id => !isNaN(id));
 
-    const itemsSituational = [
+    // Situational items: merge full_build + situational, then remove duplicates and items already in core/starting
+    const coreAndStartingSet = new Set([...itemsCore, ...itemsStarting]);
+    const itemsSituational = [...new Set([
         ...(build.items?.full_build || []),
         ...(build.items?.situational || [])
     ]
         .map(i => parseInt(i.id || i, 10))
-        .filter(id => !isNaN(id));
+        .filter(id => !isNaN(id))
+    )].filter(id => !coreAndStartingSet.has(id));
 
     const bootsId = build.items?.boots
         ? parseInt(build.items.boots.id || build.items.boots, 10)
@@ -2019,9 +2084,15 @@ function renderBuild(build) {
             )
             .join('');
 
+        const swapBtn = build.summoners.length === 2
+            ? `<button class="btn-swap-summoners" onclick="swapSummoners()" title="Swap summoner spells (D ↔ F)">
+                <i class="fas fa-exchange-alt"></i>
+            </button>`
+            : '';
+
         summonersHtml = `
         <div class="build-section summoner-section">
-            <h3><i class="fas fa-magic"></i> Summoners</h3>
+            <h3><i class="fas fa-magic"></i> Summoners ${swapBtn}</h3>
             <div class="summoners-compact">${spellsHtml}</div>
         </div>
     `;
@@ -2807,6 +2878,7 @@ window.applyFilters = applyFilters;
 window.filterItems = filterItems;
 window.retryBackendConnection = retryBackendConnection;
 window.importBuildToClient = importBuildToClient;
+window.swapSummoners = swapSummoners;
 window.updateImportButtonState = updateImportButtonState;
 window.toggleAutoImport = toggleAutoImport;
 window.initAutoImport = initAutoImport;

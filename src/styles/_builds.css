@@ -559,6 +559,29 @@
   box-shadow: 0 0 8px rgba(249, 226, 175, 0.3);
 }
 
+.btn-swap-summoners {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.btn-swap-summoners:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.btn-swap-summoners i {
+  font-size: 0.65rem;
+}
+
 /* --- SKILLS --- */
 .skills-order {
   display: flex;

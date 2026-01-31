@@ -32,13 +32,15 @@ mod overlay;
 
 use lcu::{
     add_item_set, create_rune_page, find_lockfile, get_champion_select_session,
-    ChampionSelectSession, ImportPayloadResponse, ImportResult, LcuError,
+    set_summoner_spells, ChampionSelectSession, ImportPayloadResponse, ImportResult, LcuError,
+    SummonerSpellsPayload,
 };
 use serde::{Deserialize, Serialize};
 use std::panic;
 
 /// API configuration
 const FOCUS_API_BASE_URL: &str = "https://api.hommet.ch/api/v1";
+const FOCUS_API_KEY: &str = "focusapp_prod_2026_x7k9p2m4q8v1n5r3";
 
 /// Runes primary/secondary structure for API request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,6 +157,7 @@ async fn import_build_to_client(
 
     let mut runes_imported = false;
     let mut items_imported = false;
+    let mut summoners_imported = false;
     let mut messages: Vec<String> = Vec::new();
 
     // Step 3: Import runes if available
@@ -191,7 +194,24 @@ async fn import_build_to_client(
         }
     }
 
-    let success = runes_imported || items_imported;
+    // Step 5: Import summoner spells if available (only works during champ select)
+    if let Some(spells_payload) = payload_response.summoner_spells_payload {
+        match set_summoner_spells(&connection, &spells_payload).await {
+            Ok(()) => {
+                summoners_imported = true;
+                messages.push("Summoner spells set".to_string());
+                #[cfg(debug_assertions)]
+                eprintln!("[import_build_to_client] Summoner spells imported successfully");
+            }
+            Err(e) => {
+                // Don't add to messages if not in champ select - it's expected
+                #[cfg(debug_assertions)]
+                eprintln!("[import_build_to_client] Failed to set summoner spells: {}", e);
+            }
+        }
+    }
+
+    let success = runes_imported || items_imported || summoners_imported;
     let message = if messages.is_empty() {
         "No data to import".to_string()
     } else {
@@ -202,6 +222,7 @@ async fn import_build_to_client(
         success,
         runes_imported,
         items_imported,
+        summoners_imported,
         message,
     })
 }
@@ -222,7 +243,12 @@ async fn fetch_import_payloads(
     #[cfg(debug_assertions)]
     eprintln!("[fetch_import_payloads] POST to: {}", url);
 
-    let response = client.post(&url).json(payload).send().await?;
+    let response = client
+        .post(&url)
+        .header("X-API-Key", FOCUS_API_KEY)
+        .json(payload)
+        .send()
+        .await?;
 
     if !response.status().is_success() {
         let status = response.status();
@@ -246,6 +272,40 @@ async fn fetch_import_payloads(
 #[tauri::command]
 async fn is_league_client_running() -> bool {
     find_lockfile().await.is_ok()
+}
+
+/// Set summoner spells directly in champion select.
+///
+/// This is a lightweight command that only sets summoner spells without
+/// going through the full import flow. Used for the swap summoners feature.
+#[tauri::command]
+async fn set_summoner_spells_cmd(spell1_id: i32, spell2_id: i32) -> Result<bool, CommandError> {
+    // Step 1: Connect to League Client
+    let connection = find_lockfile().await.map_err(|e| match e {
+        LcuError::ClientNotRunning => CommandError {
+            code: "CLIENT_NOT_RUNNING".to_string(),
+            message: "League Client is not running".to_string(),
+        },
+        _ => CommandError {
+            code: "CONNECTION_ERROR".to_string(),
+            message: format!("Failed to connect to League Client: {}", e),
+        },
+    })?;
+
+    // Step 2: Set summoner spells
+    let payload = SummonerSpellsPayload {
+        spell1_id,
+        spell2_id,
+    };
+
+    set_summoner_spells(&connection, &payload)
+        .await
+        .map_err(|e| CommandError {
+            code: "LCU_ERROR".to_string(),
+            message: format!("{}", e),
+        })?;
+
+    Ok(true)
 }
 
 /// Get the current champion select session.
@@ -327,6 +387,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             import_build_to_client,
             is_league_client_running,
+            set_summoner_spells_cmd,
             get_champion_select_session_cmd,
             // CS Overlay commands
             overlay::is_game_active,
