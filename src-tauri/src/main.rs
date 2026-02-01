@@ -33,7 +33,7 @@ mod overlay;
 use lcu::{
     add_item_set, create_rune_page, find_lockfile, get_champion_select_session,
     set_summoner_spells, ChampionSelectSession, ImportPayloadResponse, ImportResult, LcuError,
-    SummonerSpellsPayload,
+    SummonerSpellsPayload, FOCUS_RUNE_PAGE_PREFIX,
 };
 use serde::{Deserialize, Serialize};
 use std::panic;
@@ -161,7 +161,12 @@ async fn import_build_to_client(
     let mut messages: Vec<String> = Vec::new();
 
     // Step 3: Import runes if available
-    if let Some(rune_payload) = payload_response.rune_page_payload {
+    if let Some(mut rune_payload) = payload_response.rune_page_payload {
+        // Construct the singleton page name: "⚡{Champion} {Role}"
+        let champion = payload_response.champion.as_deref().unwrap_or("Unknown");
+        let role = payload_response.role.as_deref().unwrap_or("").to_uppercase();
+        rune_payload.name = format!("{}{} {}", FOCUS_RUNE_PAGE_PREFIX, champion, role);
+
         match create_rune_page(&connection, &rune_payload).await {
             Ok(()) => {
                 runes_imported = true;

@@ -148,6 +148,22 @@
   opacity: 0.5;
 }
 
+.global-search-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.global-search-loading .spinner-ring.small {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+
 /* Role display in search results */
 .global-search-champ-icon {
   width: 36px;

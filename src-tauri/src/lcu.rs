@@ -294,18 +294,41 @@ pub async fn delete_rune_page(connection: &LcuConnection, page_id: i64) -> Resul
     Ok(())
 }
 
-/// Create a new rune page in the League Client
+/// Prefix for FocusApp rune pages (singleton pattern)
+pub const FOCUS_RUNE_PAGE_PREFIX: &str = "⚡";
+
+/// Create a new rune page in the League Client (Singleton Pattern)
 ///
-/// # Note on Rune Page Limits
-/// Players have a limited number of rune page slots. This function will
-/// attempt to delete the oldest editable page if the client returns a
-/// "max pages reached" error.
+/// This function implements a singleton pattern for FocusApp rune pages:
+/// 1. First, delete any existing page starting with "⚡"
+/// 2. Then create the new page
+///
+/// This ensures only ONE FocusApp rune page exists at any time.
 pub async fn create_rune_page(
     connection: &LcuConnection,
     payload: &RunePagePayload,
 ) -> Result<(), LcuError> {
+    // Step 1: Get all existing rune pages
+    let pages = get_rune_pages(connection).await?;
+
+    // Step 2: Delete any existing FocusApp pages (pages starting with "⚡ FOCUS")
+    for page in pages.iter() {
+        if page.name.starts_with(FOCUS_RUNE_PAGE_PREFIX) && page.is_deletable {
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "[create_rune_page] Deleting existing FocusApp page: '{}' (id: {})",
+                page.name, page.id
+            );
+            delete_rune_page(connection, page.id).await?;
+        }
+    }
+
+    // Step 3: Create the new rune page
     let client = create_lcu_client()?;
     let url = format!("{}/lol-perks/v1/pages", connection.base_url());
+
+    #[cfg(debug_assertions)]
+    eprintln!("[create_rune_page] Creating new page: '{}'", payload.name);
 
     let response = client
         .post(&url)
@@ -319,14 +342,20 @@ pub async fn create_rune_page(
         return Ok(());
     }
 
-    // If we hit the page limit, try to delete an old page and retry
+    // If we hit the page limit, try to delete an old editable page and retry
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
 
     if body.contains("Max pages reached") || status.as_u16() == 400 {
-        // Try to delete an editable page
-        let pages = get_rune_pages(connection).await?;
-        if let Some(deletable_page) = pages.iter().find(|p| p.is_deletable && p.is_editable) {
+        // Try to delete any editable page (not a FocusApp one, since we already deleted those)
+        if let Some(deletable_page) = pages.iter().find(|p| {
+            p.is_deletable && p.is_editable && !p.name.starts_with(FOCUS_RUNE_PAGE_PREFIX)
+        }) {
+            #[cfg(debug_assertions)]
+            eprintln!(
+                "[create_rune_page] Max pages reached, deleting: '{}' (id: {})",
+                deletable_page.name, deletable_page.id
+            );
             delete_rune_page(connection, deletable_page.id).await?;
 
             // Retry creating the page
