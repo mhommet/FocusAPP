@@ -195,7 +195,7 @@ async function retryBackendConnection() {
 function switchTab(tabName) {
     currentTab = tabName;
 
-    // Update tab buttons
+    // Update tab buttons (player tab is hidden from nav, so no button to highlight)
     document.querySelectorAll('.tab-btn').forEach((btn) => {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
@@ -215,6 +215,7 @@ function switchTab(tabName) {
     if (tabName === 'changelog') {
         initChangelog();
     }
+    // Player tab is loaded via searchPlayer(), no lazy load needed here
 }
 
 /**
@@ -2333,6 +2334,27 @@ function globalSearch(query) {
         return;
     }
 
+    // Check if this is a player search (contains #)
+    if (query.includes('#')) {
+        const [gameName, tagLine] = query.split('#');
+        if (gameName && tagLine && tagLine.length >= 2) {
+            // Show loading state in dropdown
+            dropdown.innerHTML = `
+                <div class="global-search-loading">
+                    <div class="spinner-ring small"></div>
+                    <span>Searching player ${gameName}#${tagLine}...</span>
+                </div>
+            `;
+            dropdown.classList.add('visible');
+
+            // Debounce player search
+            globalSearchDebounce = setTimeout(() => {
+                searchPlayer(gameName.trim(), tagLine.trim());
+            }, 400);
+            return;
+        }
+    }
+
     // Debounce 200ms
     globalSearchDebounce = setTimeout(() => {
         const queryLower = query.toLowerCase();
@@ -2646,6 +2668,540 @@ function updateGlobalSearchHighlight(items) {
 }
 
 // =============================================================================
+// PLAYER SEARCH & PROFILE MODAL
+// =============================================================================
+
+/** Current player data for the modal */
+let currentPlayerData = null;
+
+/**
+ * Search for a player by gameName#tagLine.
+ * Opens the player modal with their profile and recent matches.
+ *
+ * @param {string} gameName - Player's game name
+ * @param {string} tagLine - Player's tag line
+ */
+/** Store the last searched player for retry */
+let lastPlayerSearch = { gameName: '', tagLine: '' };
+
+/**
+ * Search for a player by gameName#tagLine.
+ * Opens the player profile page (tab) with their profile and recent matches.
+ *
+ * @param {string} gameName - Player's game name
+ * @param {string} tagLine - Player's tag line
+ */
+async function searchPlayer(gameName, tagLine) {
+    const dropdown = document.getElementById('global-search-results');
+
+    // Store for retry
+    lastPlayerSearch = { gameName, tagLine };
+
+    // Hide dropdown and clear input immediately
+    if (dropdown) {
+        dropdown.classList.remove('visible');
+        dropdown.innerHTML = '';
+    }
+    const searchInput = document.getElementById('global-search');
+    if (searchInput) searchInput.value = '';
+
+    // Switch to player tab and show loading state
+    switchTab('player');
+    showPlayerLoading();
+
+    try {
+        console.log(`[PlayerSearch] Searching for ${gameName}#${tagLine}`);
+
+        // Call the backend API
+        const response = await window.__TAURI__.http.fetch(
+            `https://api.hommet.ch/api/v1/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+            {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-API-Key': 'focusapp_prod_2026_x7k9p2m4q8v1n5r3'
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Player not found (${response.status})`);
+        }
+
+        const data = await response.json();
+        console.log('[PlayerSearch] Player data:', data);
+
+        // Render the player profile page
+        renderPlayerProfile(data);
+
+    } catch (error) {
+        console.error('[PlayerSearch] Error:', error);
+        showPlayerError(`Could not find player "${gameName}#${tagLine}". Please check the spelling and try again.`);
+    }
+}
+
+/**
+ * Show loading state on player page.
+ */
+function showPlayerLoading() {
+    const loading = document.getElementById('player-loading');
+    const error = document.getElementById('player-error');
+    const content = document.getElementById('player-content');
+
+    if (loading) loading.style.display = 'flex';
+    if (error) error.style.display = 'none';
+    if (content) content.style.display = 'none';
+}
+
+/**
+ * Show error state on player page.
+ * @param {string} message - Error message
+ */
+function showPlayerError(message) {
+    const loading = document.getElementById('player-loading');
+    const error = document.getElementById('player-error');
+    const content = document.getElementById('player-content');
+    const errorMsg = document.getElementById('player-error-message');
+
+    if (loading) loading.style.display = 'none';
+    if (error) error.style.display = 'flex';
+    if (content) content.style.display = 'none';
+    if (errorMsg) errorMsg.textContent = message;
+}
+
+/**
+ * Retry the last player search.
+ */
+function retryPlayerSearch() {
+    if (lastPlayerSearch.gameName && lastPlayerSearch.tagLine) {
+        searchPlayer(lastPlayerSearch.gameName, lastPlayerSearch.tagLine);
+    }
+}
+
+/**
+ * Refresh the current player profile.
+ */
+function refreshPlayerProfile() {
+    if (lastPlayerSearch.gameName && lastPlayerSearch.tagLine) {
+        searchPlayer(lastPlayerSearch.gameName, lastPlayerSearch.tagLine);
+        showToast('Refreshing player data...', 'info');
+    }
+}
+
+/**
+ * Render the player profile page with data.
+ * @param {Object} data - Player data from API
+ */
+function renderPlayerProfile(data) {
+    currentPlayerData = data;
+
+    const loading = document.getElementById('player-loading');
+    const error = document.getElementById('player-error');
+    const content = document.getElementById('player-content');
+
+    if (loading) loading.style.display = 'none';
+    if (error) error.style.display = 'none';
+    if (content) content.style.display = 'block';
+
+    const player = data.player_info || data.player || {};
+    const matches = data.recent_matches || data.matches || [];
+
+    // --- Header Section ---
+    const avatarEl = document.getElementById('player-page-avatar');
+    const nameEl = document.getElementById('player-page-name');
+    const levelEl = document.getElementById('player-page-level');
+
+    const profileIconId = player.profile_icon_id || player.profileIconId || 29;
+    if (avatarEl) {
+        avatarEl.src = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/${profileIconId}.png`;
+        avatarEl.onerror = () => { avatarEl.src = 'https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/29.png'; };
+    }
+
+    if (nameEl) {
+        nameEl.textContent = `${player.game_name || player.name || 'Unknown'}#${player.tag_line || player.tag || '???'}`;
+    }
+
+    if (levelEl) {
+        levelEl.textContent = `Level ${player.summoner_level || player.level || '?'}`;
+    }
+
+    // --- Ranked Card ---
+    const rankIcon = document.getElementById('player-rank-icon');
+    const rankTier = document.getElementById('player-page-rank');
+    const rankLP = document.getElementById('player-page-lp');
+    const rankedWR = document.getElementById('player-page-ranked-wr');
+
+    const tier = (player.tier || player.rank || 'unranked').toLowerCase();
+    const division = player.division || player.rank_division || '';
+    const lp = player.lp || player.league_points || 0;
+    const rankedWins = player.wins || 0;
+    const rankedLosses = player.losses || 0;
+    const rankedTotal = rankedWins + rankedLosses;
+    const rankedWinrate = rankedTotal > 0 ? Math.round((rankedWins / rankedTotal) * 100) : 0;
+
+    if (rankIcon) {
+        rankIcon.src = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tier}.png`;
+        rankIcon.onerror = () => { rankIcon.src = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-unranked.png'; };
+    }
+
+    if (rankTier) {
+        rankTier.textContent = tier === 'unranked' ? 'Unranked' : `${tier.charAt(0).toUpperCase() + tier.slice(1)} ${division}`;
+    }
+
+    if (rankLP) {
+        rankLP.textContent = tier === 'unranked' ? '' : `${lp} LP`;
+    }
+
+    if (rankedWR) {
+        rankedWR.textContent = rankedTotal > 0 ? `${rankedWinrate}% WR (${rankedWins}W ${rankedLosses}L)` : 'No ranked games';
+    }
+
+    // --- Top Champions ---
+    renderTopChampions(matches);
+
+    // --- Recent Stats ---
+    renderRecentStats(matches);
+
+    // --- Match History ---
+    renderMatchHistory(matches);
+}
+
+/**
+ * Render top champions from recent matches.
+ * @param {Array} matches - Recent matches
+ */
+function renderTopChampions(matches) {
+    const container = document.getElementById('player-top-champs');
+    if (!container) return;
+
+    if (!matches || matches.length === 0) {
+        container.innerHTML = '<p class="no-data">No recent matches</p>';
+        return;
+    }
+
+    // Aggregate champion stats
+    const champStats = {};
+    matches.forEach(m => {
+        const name = m.champion_name || m.championName || 'Unknown';
+        if (!champStats[name]) {
+            champStats[name] = { name, wins: 0, losses: 0, games: 0 };
+        }
+        champStats[name].games++;
+        if (m.win) champStats[name].wins++;
+        else champStats[name].losses++;
+    });
+
+    // Sort by games played, take top 3
+    const topChamps = Object.values(champStats)
+        .sort((a, b) => b.games - a.games)
+        .slice(0, 3);
+
+    container.innerHTML = topChamps.map(champ => {
+        const winrate = Math.round((champ.wins / champ.games) * 100);
+        const champIcon = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/${champ.name.replace(/[^a-zA-Z]/g, '')}.png`;
+
+        return `
+            <div class="top-champ-item">
+                <img src="${champIcon}" class="top-champ-icon"
+                     onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png'">
+                <div class="top-champ-info">
+                    <span class="top-champ-name">${champ.name}</span>
+                    <span class="top-champ-stats">${champ.games} games</span>
+                </div>
+                <span class="top-champ-wr ${winrate >= 50 ? 'positive' : 'negative'}">${winrate}%</span>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Render recent performance stats.
+ * @param {Array} matches - Recent matches
+ */
+function renderRecentStats(matches) {
+    const wrEl = document.getElementById('player-recent-wr');
+    const kdaEl = document.getElementById('player-recent-kda');
+    const gamesEl = document.getElementById('player-recent-games');
+
+    if (!matches || matches.length === 0) {
+        if (wrEl) wrEl.textContent = '-';
+        if (kdaEl) kdaEl.textContent = '-';
+        if (gamesEl) gamesEl.textContent = '0';
+        return;
+    }
+
+    const wins = matches.filter(m => m.win).length;
+    const winrate = Math.round((wins / matches.length) * 100);
+
+    let totalKills = 0, totalDeaths = 0, totalAssists = 0;
+    matches.forEach(m => {
+        totalKills += m.kills || 0;
+        totalDeaths += m.deaths || 0;
+        totalAssists += m.assists || 0;
+    });
+
+    const kda = totalDeaths === 0 ? 'Perfect' : ((totalKills + totalAssists) / totalDeaths).toFixed(2);
+
+    if (wrEl) wrEl.textContent = `${winrate}%`;
+    if (kdaEl) kdaEl.textContent = kda;
+    if (gamesEl) gamesEl.textContent = matches.length.toString();
+}
+
+/**
+ * Render the match history list.
+ * @param {Array} matches - Recent matches
+ */
+function renderMatchHistory(matches) {
+    const container = document.getElementById('player-matches-list');
+    const countEl = document.getElementById('player-matches-count');
+
+    if (countEl) {
+        countEl.textContent = `${matches?.length || 0} matches`;
+    }
+
+    if (!container) return;
+
+    if (!matches || matches.length === 0) {
+        container.innerHTML = `
+            <div class="no-matches-found">
+                <i class="fas fa-ghost"></i>
+                <p>No recent matches found</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = matches.map((match, index) => {
+        const isWin = match.win;
+        const championName = match.champion_name || match.championName || 'Unknown';
+        const kills = match.kills || 0;
+        const deaths = match.deaths || 0;
+        const assists = match.assists || 0;
+        const kdaRatio = deaths === 0 ? 'Perfect' : ((kills + assists) / deaths).toFixed(2);
+        const kdaClass = deaths === 0 ? 'perfect' : (parseFloat(kdaRatio) >= 3 ? 'good' : '');
+
+        const items = match.items || [];
+        const gameMode = match.game_mode || match.queue_type || 'Normal';
+        const gameDuration = match.game_duration || 0;
+        const durationMin = Math.floor(gameDuration / 60);
+        const cs = match.cs || match.total_minions_killed || 0;
+        const champLevel = match.champ_level || match.champion_level || 0;
+
+        const champIcon = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/${championName.replace(/[^a-zA-Z]/g, '')}.png`;
+
+        // Render items (all 6 + trinket)
+        const itemSlots = [...items.slice(0, 7)];
+        while (itemSlots.length < 7) itemSlots.push(0);
+
+        const itemsHtml = itemSlots.map(itemId => {
+            if (!itemId || itemId === 0) {
+                return '<div class="match-card-item empty"></div>';
+            }
+            return `<img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/${itemId}.png"
+                         class="match-card-item"
+                         onerror="this.className='match-card-item empty'">`;
+        }).join('');
+
+        // Runes
+        const keystoneId = match.runes?.keystone || match.keystone_id || 0;
+        const secondaryTreeId = match.runes?.secondary_tree || 0;
+        const runesHtml = keystoneId
+            ? `<img src="https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/styles/${getRunePathImage(keystoneId)}"
+                    class="match-card-rune"
+                    onerror="this.style.display='none'">`
+            : '';
+
+        return `
+            <div class="match-card ${isWin ? 'win' : 'loss'}">
+                <div class="match-card-champion">
+                    <img src="${champIcon}" alt="${championName}"
+                         onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png'">
+                    ${champLevel ? `<span class="match-card-level">${champLevel}</span>` : ''}
+                </div>
+                <div class="match-card-info">
+                    <div class="match-card-header">
+                        <span class="match-card-result ${isWin ? 'win' : 'loss'}">${isWin ? 'Victory' : 'Defeat'}</span>
+                        <span class="match-card-kda">${kills}/<span>${deaths}</span>/${assists}</span>
+                        <span class="match-card-kda-ratio ${kdaClass}">${kdaRatio} KDA</span>
+                    </div>
+                    <div class="match-card-meta">
+                        <span><i class="fas fa-gamepad"></i> ${gameMode}</span>
+                        <span><i class="fas fa-clock"></i> ${durationMin}m</span>
+                        <span><i class="fas fa-coins"></i> ${cs} CS</span>
+                    </div>
+                    <div class="match-card-build">
+                        <div class="match-card-items">${itemsHtml}</div>
+                        <div class="match-card-runes">${runesHtml}</div>
+                    </div>
+                </div>
+                <div class="match-card-actions">
+                    <button class="btn-import-build" onclick="loadBuildFromMatch(${index})">
+                        <i class="fas fa-bolt"></i> Import
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+/**
+ * Get rune image path from keystone ID.
+ * @param {number} keystoneId - Keystone rune ID
+ * @returns {string} Path for CDragon image
+ */
+function getRunePathImage(keystoneId) {
+    // Map keystone IDs to their paths
+    const runeMap = {
+        // Precision
+        8005: '7201_precision/presstheattack/presstheattack.png',
+        8008: '7201_precision/lethaltempo/lethaltempotemp.png',
+        8021: '7201_precision/fleetfootwork/fleetfootwork.png',
+        8010: '7201_precision/conqueror/conqueror.png',
+        // Domination
+        8112: '7200_domination/electrocute/electrocute.png',
+        8124: '7200_domination/predator/predator.png',
+        8128: '7200_domination/darkharvest/darkharvest.png',
+        9923: '7200_domination/hailofblades/hailofblades.png',
+        // Sorcery
+        8214: '7202_sorcery/summonaery/summonaery.png',
+        8229: '7202_sorcery/arcanecomet/arcanecomet.png',
+        8230: '7202_sorcery/phaserush/phaserush.png',
+        // Resolve
+        8437: '7204_resolve/graspoftheundying/graspoftheundying.png',
+        8439: '7204_resolve/veteranaftershock/veteranaftershock.png',
+        8465: '7204_resolve/guardian/guardian.png',
+        // Inspiration
+        8351: '7203_whimsy/glacialaugment/glacialaugment.png',
+        8360: '7203_whimsy/unsealedspellbook/unsealedspellbook.png',
+        8369: '7203_whimsy/firststrike/firststrike.png',
+    };
+    return runeMap[keystoneId] || '7201_precision/presstheattack/presstheattack.png';
+}
+
+/**
+ * Load a build from a specific match in the player modal.
+ * Populates the main editor and closes the modal.
+ *
+ * @param {number} matchIndex - Index of the match in currentPlayerData.matches
+ */
+async function loadBuildFromMatch(matchIndex) {
+    if (!currentPlayerData) {
+        console.error('[LoadBuild] No player data available');
+        return;
+    }
+
+    const matches = currentPlayerData.recent_matches || currentPlayerData.matches || [];
+    const match = matches[matchIndex];
+
+    if (!match) {
+        console.error('[LoadBuild] Match not found at index:', matchIndex);
+        return;
+    }
+
+    console.log('[LoadBuild] Loading build from match:', match);
+
+    const championName = match.champion_name || match.championName || 'Unknown';
+    const playerName = currentPlayerData.player_info?.game_name || currentPlayerData.player?.name || 'Player';
+
+    // Close modal
+    closePlayerModal();
+
+    // Switch to builds tab
+    switchTab('builds');
+
+    // Wait a bit for tab switch
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Set champion in the build view
+    const champSearchInput = document.getElementById('champion-search');
+    if (champSearchInput) {
+        champSearchInput.value = championName;
+    }
+
+    // Build a custom build object from match data
+    const customBuild = {
+        champion: championName,
+        role: match.role || match.lane || 'mid',
+        source: `${playerName}'s match`,
+        patch: 'current',
+        items: {
+            starting: [],
+            core: (match.items || []).filter(id => id && id !== 0).slice(0, 3).map(id => ({ id })),
+            full_build: (match.items || []).filter(id => id && id !== 0).map(id => ({ id })),
+            boots: null,
+            situational: []
+        },
+        runes: {
+            keystone: match.runes?.keystone ? { id: match.runes.keystone } : null,
+            primary: (match.runes?.primary_runes || []).map(id => ({ id })),
+            secondary: (match.runes?.secondary_runes || []).map(id => ({ id })),
+            shards: (match.runes?.stat_shards || [5008, 5008, 5002]).map(id => ({ id }))
+        },
+        summoners: (match.summoner_spells || []).map(id => ({ id }))
+    };
+
+    // Try to load the champion build first, then overlay with match data
+    try {
+        // Load base build for champion
+        await loadChampionBuild(championName);
+
+        // Override with match items if available
+        if (currentBuild && match.items && match.items.length > 0) {
+            // Merge items from match
+            const matchItems = match.items.filter(id => id && id !== 0);
+            if (matchItems.length > 0) {
+                // Update items in currentBuild
+                currentBuild.items = currentBuild.items || {};
+                currentBuild.items.full_build = matchItems.map(id => ({
+                    id,
+                    icon: `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/${id}.png`
+                }));
+            }
+
+            // Override runes if available
+            if (match.runes) {
+                currentBuild.runes = currentBuild.runes || {};
+                if (match.runes.keystone) {
+                    currentBuild.runes.keystone = {
+                        id: match.runes.keystone,
+                        icon: `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/styles/${getRunePathImage(match.runes.keystone)}`
+                    };
+                }
+            }
+
+            // Re-render with updated data
+            renderBuild(currentBuild);
+        }
+
+    } catch (error) {
+        console.log('[LoadBuild] Could not load base build, using match data only');
+        // Fallback: set currentBuild to custom build
+        currentBuild = customBuild;
+        renderBuild(currentBuild);
+    }
+
+    // Show success toast
+    showToast(`Build loaded from ${playerName}!`, 'success');
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('player-modal');
+        if (modal && modal.style.display !== 'none') {
+            closePlayerModal();
+        }
+    }
+});
+
+// Close modal on overlay click
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('player-modal-overlay')) {
+        closePlayerModal();
+    }
+});
+
+// =============================================================================
 // CHANGELOG MANAGER - GitHub Releases & Commits
 // =============================================================================
 
@@ -2891,6 +3447,10 @@ window.normalizeRoleForBuild = normalizeRoleForBuild;
 window.globalSearch = globalSearch;
 window.selectChampionFromGlobalSearch = selectChampionFromGlobalSearch;
 window.loadGlobalSearchChampions = loadGlobalSearchChampions;
+window.searchPlayer = searchPlayer;
+window.retryPlayerSearch = retryPlayerSearch;
+window.refreshPlayerProfile = refreshPlayerProfile;
+window.loadBuildFromMatch = loadBuildFromMatch;
 window.initChangelog = initChangelog;
 window.refreshChangelog = refreshChangelog;
 

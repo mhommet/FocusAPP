@@ -20,7 +20,7 @@
             <div class="global-search-container">
                 <div class="global-search-wrapper">
                     <i class="fas fa-search global-search-icon"></i>
-                    <input type="text" id="global-search" placeholder="Search champion... (Sion, Aatrox...)" autocomplete="off" spellcheck="false">
+                    <input type="text" id="global-search" placeholder="Champion or Player#TAG..." autocomplete="off" spellcheck="false">
                     <div id="global-search-results" class="global-search-dropdown"></div>
                 </div>
             </div>
@@ -189,6 +189,105 @@
             </main>
         </div>
 
+        <!-- PLAYER PROFILE TAB (Hidden from nav, accessed via search) -->
+        <div id="player-tab" class="tab-content">
+            <!-- Loading State -->
+            <div id="player-loading" class="player-page-loading">
+                <div class="spinner-ring large"></div>
+                <p>Loading player profile...</p>
+            </div>
+
+            <!-- Error State -->
+            <div id="player-error" class="player-page-error" style="display: none;">
+                <i class="fas fa-user-slash"></i>
+                <h2>Player Not Found</h2>
+                <p id="player-error-message">The summoner could not be found.</p>
+                <button class="btn btn-primary" onclick="retryPlayerSearch()">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+                <button class="btn btn-secondary" onclick="switchTab('tierlist')">
+                    <i class="fas fa-arrow-left"></i> Back to Tier List
+                </button>
+            </div>
+
+            <!-- Player Profile Content -->
+            <div id="player-content" class="player-page-content" style="display: none;">
+                <!-- Header Section -->
+                <div class="player-page-header">
+                    <button class="player-back-btn" onclick="switchTab('tierlist')">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div class="player-identity">
+                        <img id="player-page-avatar" class="player-page-avatar" src="" alt="Avatar">
+                        <div class="player-page-info">
+                            <h1 id="player-page-name">Player#TAG</h1>
+                            <span id="player-page-level" class="player-level">Level 0</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-refresh-small" onclick="refreshPlayerProfile()">
+                        <i class="fas fa-sync-alt"></i> Update
+                    </button>
+                </div>
+
+                <!-- Main Grid Layout -->
+                <div class="player-page-grid">
+                    <!-- Sidebar (Left) -->
+                    <aside class="player-sidebar">
+                        <!-- Ranked Card -->
+                        <div class="player-ranked-card">
+                            <h3><i class="fas fa-trophy"></i> Ranked Solo/Duo</h3>
+                            <div class="ranked-info">
+                                <img id="player-rank-icon" class="rank-emblem" src="" alt="Rank">
+                                <div class="ranked-details">
+                                    <span id="player-page-rank" class="rank-tier">Unranked</span>
+                                    <span id="player-page-lp" class="rank-lp">0 LP</span>
+                                    <span id="player-page-ranked-wr" class="rank-winrate">0% WR</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Top Champions -->
+                        <div class="player-top-champs-card">
+                            <h3><i class="fas fa-star"></i> Top Champions</h3>
+                            <div id="player-top-champs" class="top-champs-list">
+                                <p class="no-data">No data available</p>
+                            </div>
+                        </div>
+
+                        <!-- Recent Stats -->
+                        <div class="player-stats-card">
+                            <h3><i class="fas fa-chart-line"></i> Recent Performance</h3>
+                            <div class="stats-grid">
+                                <div class="stat-item">
+                                    <span class="stat-value" id="player-recent-wr">0%</span>
+                                    <span class="stat-label">Win Rate</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="player-recent-kda">0.0</span>
+                                    <span class="stat-label">KDA</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="player-recent-games">0</span>
+                                    <span class="stat-label">Games</span>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <!-- Match History (Right) -->
+                    <section class="player-matches-section">
+                        <div class="matches-header">
+                            <h2><i class="fas fa-history"></i> Match History</h2>
+                            <span id="player-matches-count" class="matches-count">0 matches</span>
+                        </div>
+                        <div id="player-matches-list" class="player-matches-list-full">
+                            <!-- Match cards will be rendered here -->
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+
         <!-- ITEMS TAB -->
         <div id="items-tab" class="tab-content">
             <div class="controls-bar items-controls-bar">
@@ -280,6 +379,38 @@
                     <div class="changelog-loading">
                         <div class="spinner-ring"></div>
                         <span>Loading changelog...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Profile Modal -->
+    <div id="player-modal" class="player-modal-overlay" style="display: none;">
+        <div class="player-modal">
+            <button class="player-modal-close" onclick="closePlayerModal()">
+                <i class="fas fa-times"></i>
+            </button>
+
+            <!-- Player Header -->
+            <div class="player-modal-header">
+                <img id="player-avatar" class="player-avatar" src="" alt="Avatar">
+                <div class="player-info">
+                    <h2 id="player-name" class="player-name">Loading...</h2>
+                    <div class="player-rank-container">
+                        <span id="player-rank" class="player-rank-badge">Unranked</span>
+                        <span id="player-winrate" class="player-winrate">0% WR (0W/0L)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Match History -->
+            <div class="player-modal-body">
+                <h3><i class="fas fa-history"></i> Recent Matches</h3>
+                <div id="player-matches" class="player-matches-list">
+                    <div class="player-matches-loading">
+                        <div class="spinner-ring"></div>
+                        <span>Loading matches...</span>
                     </div>
                 </div>
             </div>
