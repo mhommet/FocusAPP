@@ -33,7 +33,7 @@ mod overlay;
 use lcu::{
     add_item_set, create_rune_page, find_lockfile, get_champion_select_session,
     set_summoner_spells, ChampionSelectSession, ImportPayloadResponse, ImportResult, LcuError,
-    SummonerSpellsPayload, FOCUS_RUNE_PAGE_PREFIX,
+    SummonerSpellsPayload, FOCUS_ITEM_SET_PREFIX, FOCUS_RUNE_PAGE_PREFIX,
 };
 use serde::{Deserialize, Serialize};
 use std::panic;
@@ -183,7 +183,12 @@ async fn import_build_to_client(
     }
 
     // Step 4: Import item set if available
-    if let Some(item_set_payload) = payload_response.item_set_payload {
+    if let Some(mut item_set_payload) = payload_response.item_set_payload {
+        // Construct the singleton page name: "⚡{Champion} {Role}"
+        let champion = payload_response.champion.as_deref().unwrap_or("Unknown");
+        let role = payload_response.role.as_deref().unwrap_or("").to_uppercase();
+        item_set_payload.title = format!("{}{} {}", FOCUS_ITEM_SET_PREFIX, champion, role);
+
         match add_item_set(&connection, &item_set_payload).await {
             Ok(()) => {
                 items_imported = true;

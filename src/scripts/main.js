@@ -1642,6 +1642,17 @@ function startAutoImportListener() {
         clearInterval(autoImportPollInterval);
     }
 
+    // Check if Tauri is available
+    if (!window.__TAURI__ || !window.__TAURI__.core) {
+        console.warn('[AutoImport] Tauri not available yet, retrying in 500ms...');
+        setTimeout(() => {
+            if (autoImportEnabled) {
+                startAutoImportListener();
+            }
+        }, 500);
+        return;
+    }
+
     console.log('[AutoImport] Starting Live Client Data listener...');
 
     // Reset state
@@ -1921,6 +1932,10 @@ function initAutoImport() {
     const toggle = document.getElementById('auto-import-toggle');
     if (toggle) {
         toggle.checked = enabled;
+
+        // Attach event listener (remove old one first to prevent duplicates)
+        toggle.removeEventListener('change', handleAutoImportToggle);
+        toggle.addEventListener('change', handleAutoImportToggle);
     }
 
     const statusEl = document.getElementById('auto-import-status');
@@ -1935,6 +1950,14 @@ function initAutoImport() {
     }
 
     console.log(`[AutoImport] Initialized, enabled: ${enabled}`);
+}
+
+/**
+ * Handle auto-import toggle change event.
+ * @param {Event} event - The change event
+ */
+function handleAutoImportToggle(event) {
+    toggleAutoImport(event.target.checked);
 }
 
 /**
@@ -2086,7 +2109,7 @@ function renderBuild(build) {
             .join('');
 
         const swapBtn = build.summoners.length === 2
-            ? `<button class="btn-swap-summoners" onclick="swapSummoners()" title="Swap summoner spells (D ↔ F)">
+            ? `<button class="btn-swap-summoners" id="swap-summoners-btn" title="Swap summoner spells (D ↔ F)">
                 <i class="fas fa-exchange-alt"></i>
             </button>`
             : '';
@@ -2242,12 +2265,12 @@ function renderBuild(build) {
             </div>
             <!-- Import to LoL button - Requires explicit user click (compliance with Riot ToS) -->
             <div class="build-actions">
-                <button id="import-build-btn" class="btn btn-import" onclick="importBuildToClient()" title="Import runes and item set to League Client">
+                <button id="import-build-btn" class="btn btn-import" title="Import runes and item set to League Client">
                     <i class="fas fa-download"></i> Import to LoL
                 </button>
                 <div class="auto-import-container">
                     <label class="auto-import-label" title="Automatically import builds when you pick a champion in champ select">
-                        <input type="checkbox" id="auto-import-toggle" onchange="toggleAutoImport(this.checked)">
+                        <input type="checkbox" id="auto-import-toggle">
                         <span class="toggle-slider"></span>
                         <span class="toggle-text">Auto-import</span>
                     </label>
@@ -2268,6 +2291,20 @@ function renderBuild(build) {
 
     // Update import button state based on League Client status
     updateImportButtonState();
+
+    // Attach event listener to import button (recreated in innerHTML)
+    const importBtn = document.getElementById('import-build-btn');
+    if (importBtn) {
+        importBtn.removeEventListener('click', importBuildToClient);
+        importBtn.addEventListener('click', importBuildToClient);
+    }
+
+    // Attach event listener to swap summoners button (recreated in innerHTML)
+    const swapBtn = document.getElementById('swap-summoners-btn');
+    if (swapBtn) {
+        swapBtn.removeEventListener('click', swapSummoners);
+        swapBtn.addEventListener('click', swapSummoners);
+    }
 
     // BUG FIX: Restore auto-import toggle state after re-rendering
     // The toggle gets recreated in innerHTML, so we must restore its checked state

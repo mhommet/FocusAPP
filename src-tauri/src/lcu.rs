@@ -297,6 +297,9 @@ pub async fn delete_rune_page(connection: &LcuConnection, page_id: i64) -> Resul
 /// Prefix for FocusApp rune pages (singleton pattern)
 pub const FOCUS_RUNE_PAGE_PREFIX: &str = "⚡";
 
+/// Prefix for FocusApp item sets (singleton pattern)
+pub const FOCUS_ITEM_SET_PREFIX: &str = "Focus: ";
+
 /// Create a new rune page in the League Client (Singleton Pattern)
 ///
 /// This function implements a singleton pattern for FocusApp rune pages:
@@ -539,7 +542,7 @@ pub async fn update_item_sets(
 /// Add an item set to the player's collection
 ///
 /// This will fetch existing item sets, add the new one, and save.
-/// If an item set with the same title exists, it will be replaced.
+/// Uses singleton pattern: removes all existing FocusApp item sets before adding new one.
 pub async fn add_item_set(
     connection: &LcuConnection,
     item_set: &ItemSetPayload,
@@ -547,10 +550,10 @@ pub async fn add_item_set(
     let summoner_id = get_current_summoner_id(connection).await?;
     let mut sets_response = get_item_sets(connection, summoner_id).await?;
 
-    // Remove existing item set with the same title (if any)
+    // Remove ALL existing FocusApp item sets (singleton pattern - only keep one)
     sets_response
         .item_sets
-        .retain(|s| s.title != item_set.title);
+        .retain(|s| !s.title.starts_with(FOCUS_ITEM_SET_PREFIX));
 
     // Add the new item set
     sets_response.item_sets.push(item_set.clone());
