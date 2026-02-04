@@ -119,6 +119,140 @@ let globalSearchDebounce = null;
 /** @type {number} Highlighted index for keyboard navigation */
 let globalSearchHighlightIndex = -1;
 
+/** @type {string} LocalStorage key for search history */
+const SEARCH_HISTORY_KEY = 'focus_search_history';
+
+/** @type {number} Maximum number of search history items */
+const MAX_SEARCH_HISTORY = 5;
+
+// =============================================================================
+// SEARCH HISTORY MANAGEMENT
+// =============================================================================
+
+/**
+ * Get search history from localStorage.
+ * @returns {Array<{gameName: string, tagLine: string, icon: number}>}
+ */
+function getSearchHistory() {
+    try {
+        const history = localStorage.getItem(SEARCH_HISTORY_KEY);
+        return history ? JSON.parse(history) : [];
+    } catch (e) {
+        console.warn('[SearchHistory] Failed to parse history:', e);
+        return [];
+    }
+}
+
+/**
+ * Add a player to search history.
+ * Adds to the top, removes duplicates, and keeps max 5 items.
+ * @param {{gameName: string, tagLine: string, icon: number}} profile
+ */
+function addToSearchHistory(profile) {
+    if (!profile.gameName || !profile.tagLine) return;
+
+    let history = getSearchHistory();
+
+    // Remove existing entry for this player (case-insensitive match)
+    history = history.filter(
+        item => !(item.gameName.toLowerCase() === profile.gameName.toLowerCase() &&
+                  item.tagLine.toLowerCase() === profile.tagLine.toLowerCase())
+    );
+
+    // Add to the top
+    history.unshift({
+        gameName: profile.gameName,
+        tagLine: profile.tagLine,
+        icon: profile.icon || 29
+    });
+
+    // Keep only max items
+    history = history.slice(0, MAX_SEARCH_HISTORY);
+
+    try {
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {
+        console.warn('[SearchHistory] Failed to save history:', e);
+    }
+}
+
+/**
+ * Remove a specific item from search history.
+ * @param {number} index - Index of the item to remove
+ */
+function removeFromSearchHistory(index) {
+    let history = getSearchHistory();
+    history.splice(index, 1);
+
+    try {
+        localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {
+        console.warn('[SearchHistory] Failed to save history:', e);
+    }
+}
+
+/**
+ * Render search history in the dropdown.
+ * Shows recent searches when input is focused and empty.
+ */
+function renderSearchHistory() {
+    const dropdown = document.getElementById('global-search-results');
+    const searchInput = document.getElementById('global-search');
+
+    if (!dropdown || !searchInput) return;
+
+    const history = getSearchHistory();
+
+    if (history.length === 0) {
+        dropdown.classList.remove('visible');
+        return;
+    }
+
+    // Build the history HTML
+    let html = '<div class="search-history-header"><i class="fas fa-clock"></i>Recent Searches</div>';
+
+    history.forEach((item, index) => {
+        const iconUrl = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${item.icon}.jpg`;
+        html += `
+            <div class="search-history-item" data-index="${index}" data-name="${item.gameName}" data-tag="${item.tagLine}">
+                <img src="${iconUrl}" alt="icon" onerror="this.src='https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/29.jpg'">
+                <div class="search-history-info">
+                    <span class="search-history-name">${item.gameName}</span>
+                    <span class="search-history-tag">#${item.tagLine}</span>
+                </div>
+                <button class="search-history-remove" data-index="${index}" title="Remove from history">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        `;
+    });
+
+    dropdown.innerHTML = html;
+    dropdown.classList.add('visible');
+
+    // Attach event listeners to history items
+    dropdown.querySelectorAll('.search-history-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            // Don't trigger if clicking the remove button
+            if (e.target.closest('.search-history-remove')) return;
+
+            const gameName = item.dataset.name;
+            const tagLine = item.dataset.tag;
+            searchPlayer(gameName, tagLine);
+        });
+    });
+
+    // Attach event listeners to remove buttons
+    dropdown.querySelectorAll('.search-history-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = parseInt(btn.dataset.index, 10);
+            removeFromSearchHistory(index);
+            renderSearchHistory(); // Re-render
+        });
+    });
+}
+
 // =============================================================================
 // INITIALIZATION
 // =============================================================================
@@ -2923,6 +3057,15 @@ function renderPlayerProfile(data) {
   const tags = data.tags || [];
   let rawMatches = data.recent_builds || []; // API renvoie 'recent_builds'
 
+  // Add to search history on successful profile load
+  if (profile.game_name && profile.tag_line) {
+    addToSearchHistory({
+      gameName: profile.game_name,
+      tagLine: profile.tag_line,
+      icon: profile.profile_icon_id || 29
+    });
+  }
+
   // Si on n'a pas de rang dans le profil, on regarde si on peut le déduire (non, pas dispo ici)
   // On met des valeurs par défaut pour éviter le "undefined"
   const displayTier = (profile.tier || stats.tier || "UNRANKED").toUpperCase();
@@ -3571,6 +3714,12 @@ window.retryPlayerSearch = retryPlayerSearch;
 window.refreshPlayerProfile = refreshPlayerProfile;
 window.initChangelog = initChangelog;
 window.refreshChangelog = refreshChangelog;
+window.autoImportBuild = autoImportBuild;
+window.showToast = showToast;
+// Expose champion data for GameflowController
+window.allChampions = allChampions;
+window.buildChampions = buildChampions;
+window.currentBuild = currentBuild;
 
 // =============================================================================
 // EVENT LISTENERS (Alternative aux onclick inline)
@@ -3584,6 +3733,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize auto-import feature (respects saved user preference)
     initAutoImport();
+
+    // Initialize CS Overlay game watcher (monitors for in-game state)
+    if (window.CsOverlayService) {
+        window.CsOverlayService.startGameWatcher();
+        console.log('✅ CS Overlay game watcher started');
+    }
+
+    // Initialize Gameflow Controller (LCU-based automation)
+    // Handles: auto-tab switch to Builds, champion detection, auto-import
+    if (window.GameflowController) {
+        // Configure callbacks for integration with existing UI
+        window.GameflowController.setCallbacks({
+            onPhaseChange: (newPhase, oldPhase) => {
+                console.log(`[Gameflow] Phase: ${oldPhase} -> ${newPhase}`);
+            },
+            onChampionDetected: (championId, role) => {
+                console.log(`[Gameflow] Champion detected: ${championId} (${role})`);
+            },
+            onBuildLoaded: (championName, role) => {
+                console.log(`[Gameflow] Build loaded: ${championName} ${role}`);
+            },
+            onBuildImported: (championName, role) => {
+                console.log(`[Gameflow] Build imported: ${championName} ${role}`);
+            },
+            onError: (type, error) => {
+                console.error(`[Gameflow] Error (${type}):`, error);
+            },
+        });
+
+        // Start monitoring when client is connected
+        window.GameflowController.start();
+        console.log('✅ Gameflow Controller started');
+    }
 
     // Periodically check League Client status to update import button
     // Check every 5 seconds to keep button state accurate
@@ -3848,17 +4030,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const globalSearchInput = document.getElementById('global-search');
     const globalSearchDropdown = document.getElementById('global-search-results');
     if (globalSearchInput) {
-        // Live search on input
+        // Live search on input - show history if empty, otherwise search
         globalSearchInput.addEventListener('input', (e) => {
-            globalSearch(e.target.value);
+            const value = e.target.value.trim();
+            if (value === '') {
+                renderSearchHistory();
+            } else {
+                globalSearch(e.target.value);
+            }
         });
 
         // Keyboard navigation
         globalSearchInput.addEventListener('keydown', handleGlobalSearchKeyboard);
 
-        // Show dropdown on focus if there's text
+        // Show dropdown on focus - history if empty, search results if typing
         globalSearchInput.addEventListener('focus', () => {
-            if (globalSearchInput.value.length >= 2) {
+            if (globalSearchInput.value.trim() === '') {
+                renderSearchHistory();
+            } else if (globalSearchInput.value.length >= 2) {
                 globalSearch(globalSearchInput.value);
             }
         });

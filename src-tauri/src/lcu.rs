@@ -654,6 +654,171 @@ pub async fn get_champion_select_session(
     response.json().await.map_err(LcuError::HttpError)
 }
 
+// =============================================================================
+// GAMEFLOW SESSION - For monitoring game state transitions
+// =============================================================================
+
+/// Possible game phases from the LCU Gameflow API.
+///
+/// # Compliance Note
+/// - This uses the official /lol-gameflow/v1/session endpoint
+/// - Read-only monitoring of publicly available game state
+/// - No modifications to game behavior
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum GameflowPhase {
+    None,
+    Lobby,
+    Matchmaking,
+    CheckedIntoTournament,
+    ReadyCheck,
+    ChampSelect,
+    GameStart,
+    FailedToLaunch,
+    InProgress,
+    Reconnect,
+    WaitingForStats,
+    PreEndOfGame,
+    EndOfGame,
+    TerminatedInError,
+    #[serde(other)]
+    Unknown,
+}
+
+impl Default for GameflowPhase {
+    fn default() -> Self {
+        GameflowPhase::None
+    }
+}
+
+/// Gameflow session data from the LCU API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameflowSession {
+    pub phase: GameflowPhase,
+    #[serde(default)]
+    pub game_client: Option<GameClient>,
+    #[serde(default)]
+    pub game_data: Option<GameData>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GameClient {
+    #[serde(default)]
+    pub running: bool,
+    #[serde(default)]
+    pub visible: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GameData {
+    #[serde(default)]
+    pub game_id: i64,
+    #[serde(default)]
+    pub queue: Option<QueueInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct QueueInfo {
+    #[serde(default)]
+    pub id: i32,
+    #[serde(default)]
+    pub is_ranked: bool,
+    #[serde(rename = "type", default)]
+    pub queue_type: String,
+}
+
+/// Current summoner data from the LCU API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrentSummoner {
+    pub summoner_id: i64,
+    pub account_id: i64,
+    pub puuid: String,
+    pub display_name: String,
+    #[serde(default)]
+    pub summoner_level: i64,
+    #[serde(default)]
+    pub profile_icon_id: i32,
+}
+
+/// Get the current gameflow session from the League Client.
+///
+/// # Compliance Note
+/// - Uses official LCU endpoint /lol-gameflow/v1/session
+/// - Read-only operation for monitoring game state
+/// - No competitive advantage - same info visible in client UI
+pub async fn get_gameflow_session(
+    connection: &LcuConnection,
+) -> Result<GameflowSession, LcuError> {
+    let client = create_lcu_client()?;
+    let url = format!(
+        "{}/lol-gameflow/v1/session",
+        connection.base_url()
+    );
+
+    let response = client
+        .get(&url)
+        .header("Authorization", connection.auth_header())
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(LcuError::ApiError(format!(
+            "Gameflow session error: {} - {}",
+            status, body
+        )));
+    }
+
+    response.json().await.map_err(LcuError::HttpError)
+}
+
+/// Get the current summoner (logged-in user) from the League Client.
+///
+/// # Compliance Note
+/// - Uses official LCU endpoint /lol-summoner/v1/current-summoner
+/// - Returns public profile information of the logged-in user
+/// - Required to identify local player's cellId in champion select
+pub async fn get_current_summoner(
+    connection: &LcuConnection,
+) -> Result<CurrentSummoner, LcuError> {
+    let client = create_lcu_client()?;
+    let url = format!(
+        "{}/lol-summoner/v1/current-summoner",
+        connection.base_url()
+    );
+
+    let response = client
+        .get(&url)
+        .header("Authorization", connection.auth_header())
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(LcuError::ApiError(format!(
+            "Current summoner error: {} - {}",
+            status, body
+        )));
+    }
+
+    response.json().await.map_err(LcuError::HttpError)
+}
+
+/// Get only the gameflow phase (lightweight check).
+/// Returns the phase as a string for simpler frontend handling.
+pub async fn get_gameflow_phase(
+    connection: &LcuConnection,
+) -> Result<String, LcuError> {
+    let session = get_gameflow_session(connection).await?;
+    Ok(format!("{:?}", session.phase))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -32,8 +32,9 @@ mod overlay;
 
 use lcu::{
     add_item_set, create_rune_page, find_lockfile, get_champion_select_session,
-    set_summoner_spells, ChampionSelectSession, ImportPayloadResponse, ImportResult, LcuError,
-    SummonerSpellsPayload, FOCUS_ITEM_SET_PREFIX, FOCUS_RUNE_PAGE_PREFIX,
+    get_current_summoner, get_gameflow_session, set_summoner_spells,
+    ChampionSelectSession, CurrentSummoner, GameflowSession, ImportPayloadResponse,
+    ImportResult, LcuError, SummonerSpellsPayload, FOCUS_ITEM_SET_PREFIX, FOCUS_RUNE_PAGE_PREFIX,
 };
 use serde::{Deserialize, Serialize};
 use std::panic;
@@ -352,6 +353,35 @@ async fn get_champion_select_session_cmd() -> Result<ChampionSelectSession, Comm
         .map_err(CommandError::from)
 }
 
+/// Get the current gameflow session from the League Client.
+///
+/// # Compliance Note
+/// - Uses official LCU endpoint /lol-gameflow/v1/session
+/// - Read-only monitoring of game state (Lobby, ChampSelect, InProgress, etc.)
+/// - No competitive advantage - same info is visible in the client UI
+/// - Used for auto-switching tabs when entering champion select
+#[tauri::command]
+async fn get_gameflow_session_cmd() -> Result<GameflowSession, CommandError> {
+    let connection = find_lockfile().await.map_err(CommandError::from)?;
+    get_gameflow_session(&connection)
+        .await
+        .map_err(CommandError::from)
+}
+
+/// Get the current summoner (logged-in user) from the League Client.
+///
+/// # Compliance Note
+/// - Uses official LCU endpoint /lol-summoner/v1/current-summoner
+/// - Returns only public profile information of the logged-in user
+/// - Required to identify the local player's cellId in champion select
+#[tauri::command]
+async fn get_current_summoner_cmd() -> Result<CurrentSummoner, CommandError> {
+    let connection = find_lockfile().await.map_err(CommandError::from)?;
+    get_current_summoner(&connection)
+        .await
+        .map_err(CommandError::from)
+}
+
 /// Initialize the application with proper error handling.
 /// This function runs before Tauri starts to catch early errors.
 fn initialize_app() -> Result<(), Box<dyn std::error::Error>> {
@@ -414,12 +444,17 @@ fn main() {
             set_summoner_spells_cmd,
             get_env_api_key,
             get_champion_select_session_cmd,
+            // Gameflow monitoring commands
+            get_gameflow_session_cmd,
+            get_current_summoner_cmd,
             // CS Overlay commands
             overlay::is_game_active,
             overlay::get_live_cs_stats,
             overlay::show_cs_overlay,
             overlay::hide_cs_overlay,
-            overlay::set_overlay_click_through
+            overlay::set_overlay_click_through,
+            overlay::move_overlay,
+            overlay::emit_cs_update
         ])
         .setup(|_app| {
             #[cfg(debug_assertions)]
