@@ -18,14 +18,33 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # OBLIGATOIRE : Récupère tout l'historique pour trouver les tags
 
+      # 1. On trouve manuellement le tag précédent via Git (plus fiable que l'auto-détection)
+      - name: Get previous tag
+        id: previoustag
+        shell: bash
+        run: |
+          # Trie les tags par date décroissante
+          PREV_TAG=$(git tag --sort=-committerdate | grep -A 1 ${{ github.ref_name }} | tail -n 1)
+          
+          # Si c'est la première release ou pas de tag trouvé, on prend le premier commit
+          if [ -z "$PREV_TAG" ] || [ "$PREV_TAG" == "${{ github.ref_name }}" ]; then
+            echo "No previous tag found, using initial commit"
+            PREV_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          
+          echo "Previous tag identified: $PREV_TAG"
+          echo "tag=$PREV_TAG" >> $GITHUB_OUTPUT
+
+      # 2. On génère le changelog en lisant les COMMITS (commitMode: true)
       - name: Generate changelog
         id: changelog
-        uses: mikepenz/release-changelog-builder-action@v5 # Mis à jour vers v5
+        uses: mikepenz/release-changelog-builder-action@v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          # Configuration pour mapper "feat: ..." vers la catégorie Features
           configurationJson: |
             {
               "categories": [
@@ -50,11 +69,9 @@ jobs:
               "prerelease": false,
               "ignore_labels": ["ignore"]
             }
-          # Cette option est cruciale : si tu n'utilises pas de Pull Requests,
-          # il faut dire à l'action de regarder les commits directement.
-          fromTag: "auto" 
+          fromTag: ${{ steps.previoustag.outputs.tag }}
           toTag: ${{ github.ref_name }}
-          commitMode: true # FORCE LA LECTURE DES COMMITS (pas seulement les PRs)
+          commitMode: true # IMPORTANT : Lit les messages de commit au lieu des PRs
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -102,7 +119,7 @@ jobs:
 
             ---
             
-            **Full Changelog**: https://github.com/${{ github.repository }}/commits/${{ github.ref_name }}
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.previoustag.outputs.tag }}...${{ github.ref_name }}
           releaseDraft: false
           prerelease: false
 
