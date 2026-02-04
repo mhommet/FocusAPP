@@ -1481,24 +1481,18 @@ function buildImportPayload(build) {
         extractedShards[2] || defaultShards[2]
     ];
 
-    // Extract item IDs with deduplication
+    // Extract item IDs (V2 API - single build array in purchase order)
     const itemsStarting = (build.items?.starting || [])
         .map(i => parseInt(i.id || i, 10))
         .filter(id => !isNaN(id));
 
-    const itemsCore = (build.items?.core || [])
+    // Build items: first 3 = core, rest = situational (for import payload)
+    const allBuildItems = (build.items?.build || [])
         .map(i => parseInt(i.id || i, 10))
         .filter(id => !isNaN(id));
 
-    // Situational items: merge full_build + situational, then remove duplicates and items already in core/starting
-    const coreAndStartingSet = new Set([...itemsCore, ...itemsStarting]);
-    const itemsSituational = [...new Set([
-        ...(build.items?.full_build || []),
-        ...(build.items?.situational || [])
-    ]
-        .map(i => parseInt(i.id || i, 10))
-        .filter(id => !isNaN(id))
-    )].filter(id => !coreAndStartingSet.has(id));
+    const itemsCore = allBuildItems.slice(0, 3);
+    const itemsSituational = allBuildItems.slice(3);
 
     const bootsId = build.items?.boots
         ? parseInt(build.items.boots.id || build.items.boots, 10)
@@ -1961,36 +1955,6 @@ function handleAutoImportToggle(event) {
 }
 
 /**
- * Deduplicate items by ID.
- * Removes duplicate items from an array, keeping only the first occurrence.
- * @param {Array} items - Array of items (may contain duplicates)
- * @returns {Array} Array of unique items
- */
-function deduplicateItems(items) {
-    if (!items || !Array.isArray(items)) {
-        return [];
-    }
-
-    const seen = new Set();
-    const uniqueItems = [];
-
-    for (const item of items) {
-        if (!item) continue;
-
-        const itemId = item.id || item;
-        if (seen.has(itemId)) {
-            console.log(`[Build] Duplicate item removed: ${item.name || itemId}`);
-            continue;
-        }
-
-        seen.add(itemId);
-        uniqueItems.push(item);
-    }
-
-    return uniqueItems;
-}
-
-/**
  * Render the champion build in the UI.
  * @param {Object} build - Build data from API
  * @returns {void}
@@ -2122,14 +2086,14 @@ function renderBuild(build) {
     `;
     }
 
-    // === ITEMS ===
+    // === ITEMS (V2 API - Server handles all filtering/sorting) ===
     let itemsHtml = '';
     if (build.items) {
-        // Starting items (deduplicated)
+        // Starting items
         let startingHtml = '';
-        const uniqueStartingItems = deduplicateItems(build.items.starting || []);
-        if (uniqueStartingItems.length > 0) {
-            const startItems = uniqueStartingItems
+        const startingItems = build.items.starting || [];
+        if (startingItems.length > 0) {
+            const startItems = startingItems
                 .map(
                     (i) =>
                         `<img src="${i.icon}" alt="${i.name || 'Starting Item'}" title="${i.name || 'Starting Item'}" class="build-item small" onerror="this.style.display='none'">`
@@ -2143,7 +2107,7 @@ function renderBuild(build) {
         `;
         }
 
-        // Boots (separate section)
+        // Boots
         let bootsHtml = '';
         if (build.items.boots) {
             const bootIcon = build.items.boots.icon || '';
@@ -2160,62 +2124,20 @@ function renderBuild(build) {
             }
         }
 
-        // Core items (deduplicated, WITHOUT boots)
-        let coreHtml = '';
-        const uniqueCoreItems = deduplicateItems(build.items.core || []);
-        if (uniqueCoreItems.length > 0) {
-            const bootsId = build.items.boots ? build.items.boots.id || build.items.boots : null;
-            const coreItems = uniqueCoreItems
-                .filter((item) => {
-                    const itemId = item.id || item;
-                    return itemId !== bootsId;
-                })
-                .map(
-                    (i) =>
-                        `<img src="${i.icon}" alt="${i.name || 'Core Item'}" title="${i.name || 'Core Item'}" class="build-item" onerror="this.style.display='none'">`
-                )
-                .join('');
-
-            if (coreItems) {
-                coreHtml = `
-                <div class="items-group core">
-                    <div class="items-row-label"><i class="fas fa-cube"></i> CORE BUILD</div>
-                    <div class="items-row">${coreItems}</div>
-                </div>
-            `;
-            }
-        }
-
-        // Recommended Items (Full Build + Situational combined, no duplicates)
-        let recommendedHtml = '';
-        const coreIds = (build.items.core || []).map((i) => i.id || i);
-        const startingIds = (build.items.starting || []).map((i) => i.id || i);
-        const bootsId = build.items.boots ? build.items.boots.id || build.items.boots : null;
-
-        // Combine full_build and situational, removing duplicates and already-shown items
-        const seenIds = new Set();
-        const allRecommended = [...(build.items.full_build || []), ...(build.items.situational || [])].filter((item) => {
-            const itemId = item.id || item;
-            // Skip if already in core, starting, boots, or already seen
-            if (coreIds.includes(itemId) || startingIds.includes(itemId) || itemId === bootsId || seenIds.has(itemId)) {
-                return false;
-            }
-            seenIds.add(itemId);
-            return true;
-        });
-
-        if (allRecommended.length > 0) {
-            const recommendedItems = allRecommended
+        // Build items (single unified section - order is purchase order from API)
+        let buildHtml = '';
+        const buildItemsArray = build.items.build || [];
+        if (buildItemsArray.length > 0) {
+            const buildItemsHtml = buildItemsArray
                 .map(
                     (i) =>
                         `<img src="${i.icon}" alt="${i.name || 'Item'}" title="${i.name || 'Item'}" class="build-item" onerror="this.style.display='none'">`
                 )
                 .join('');
-
-            recommendedHtml = `
-            <div class="items-group recommended">
-                <div class="items-row-label"><i class="fas fa-star"></i> RECOMMENDED</div>
-                <div class="items-row">${recommendedItems}</div>
+            buildHtml = `
+            <div class="items-group build">
+                <div class="items-row-label"><i class="fas fa-cube"></i> BUILD</div>
+                <div class="items-row">${buildItemsHtml}</div>
             </div>
         `;
         }
@@ -2226,8 +2148,7 @@ function renderBuild(build) {
             <div class="items-build">
                 ${startingHtml}
                 ${bootsHtml}
-                ${coreHtml}
-                ${recommendedHtml}
+                ${buildHtml}
             </div>
         </div>
     `;
@@ -3163,10 +3084,8 @@ async function loadBuildFromMatch(matchIndex) {
         patch: 'current',
         items: {
             starting: [],
-            core: (match.items || []).filter(id => id && id !== 0).slice(0, 3).map(id => ({ id })),
-            full_build: (match.items || []).filter(id => id && id !== 0).map(id => ({ id })),
-            boots: null,
-            situational: []
+            build: (match.items || []).filter(id => id && id !== 0).map(id => ({ id })),
+            boots: null
         },
         runes: {
             keystone: match.runes?.keystone ? { id: match.runes.keystone } : null,
@@ -3189,7 +3108,7 @@ async function loadBuildFromMatch(matchIndex) {
             if (matchItems.length > 0) {
                 // Update items in currentBuild
                 currentBuild.items = currentBuild.items || {};
-                currentBuild.items.full_build = matchItems.map(id => ({
+                currentBuild.items.build = matchItems.map(id => ({
                     id,
                     icon: `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/${id}.png`
                 }));

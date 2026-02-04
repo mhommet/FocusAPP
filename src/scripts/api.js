@@ -488,66 +488,13 @@ function formatBuildResponse(data, champion, role) {
     }
   }
 
-  // === ITEMS ===
-  // API format: build.items = [{ slot: "first", items: [{ id, name, count, winrate }] }, ...]
-  const itemsArray = buildData.items || [];
+  // === ITEMS (V2 API - Server handles all filtering/sorting) ===
+  // V2 API format:
+  // - data.starting_items: flat array of starting items
+  // - buildData.items: flat array of core build items (max 6)
+  // - buildData.boots: single boots object
 
-  // BUG FIX: Proper item ID classifications for filtering
-  // Valid starting items (gold_cost < 500 OR traditional starters)
-  const validStarterIds = [
-    // Doran's items
-    1055, // Doran's Blade
-    1054, // Doran's Shield
-    1056, // Doran's Ring
-    1082, // Dark Seal
-    1083, // Cull
-    // Potions
-    2003, // Health Potion
-    2031, // Refillable Potion
-    2033, // Corrupting Potion
-    2055, // Control Ward
-    // Support items
-    3850,
-    3851,
-    3853, // Spellthief's line
-    3854,
-    3855,
-    3857, // Relic Shield line
-    3858,
-    3859,
-    3860, // Spectral Sickle line
-    3862,
-    3863,
-    3864, // Steel Shoulderguards line
-    // Long Sword / Amplifying Tome for some builds
-    1036, // Long Sword (350g)
-    1037, // Pickaxe - NOT a starter, removing
-    1052, // Amplifying Tome (400g)
-    // Boots (basic)
-    1001, // Boots (300g)
-    // Tear
-    3070, // Tear of the Goddess (400g)
-  ];
-
-  const bootIds = [1001, 3006, 3009, 3020, 3047, 3111, 3117, 3158, 3013]; // Added Sorcerer's Boots variant
-
-  // Full items (expensive, NOT starters) - these should NEVER be in starting items
-  const fullItemMinGold = 2000; // Items above this are definitely not starters
-
-  // Helper to get best item from a slot
-  const getBestItemFromSlot = (slotName) => {
-    const slot = itemsArray.find((s) => s.slot === slotName);
-    if (slot && slot.items && slot.items.length > 0) {
-      // Get item with highest count
-      return slot.items.reduce(
-        (best, curr) => (curr.count > (best?.count || 0) ? curr : best),
-        null,
-      );
-    }
-    return null;
-  };
-
-  // Helper to format item
+  // Helper to format item with icon URL
   const formatItem = (item) => {
     if (!item) return null;
     return {
@@ -557,96 +504,19 @@ function formatBuildResponse(data, champion, role) {
     };
   };
 
-  // BUG FIX: Starting items - ONLY show valid low-cost starting items (boots/potions/Doran's)
-  // Filter out full items like Guardian Angel that incorrectly appear in "first" slot
-  const startingItems = [];
-  const firstSlot = itemsArray.find((s) => s.slot === "first");
-  if (firstSlot && firstSlot.items && firstSlot.items.length > 0) {
-    // Filter to only valid starting items (in validStarterIds list OR gold < 500)
-    const validStartingItems = firstSlot.items.filter((item) => {
-      const itemId = parseInt(item.id);
-      // Accept if it's in our known starter list
-      if (validStarterIds.includes(itemId)) return true;
-      // Accept basic boots
-      if (itemId === 1001) return true;
-      // Reject everything else (full items like Guardian Angel should NOT be starters)
-      return false;
-    });
+  // Starting items (directly from API - server already filtered)
+  const startingItems = (data.starting_items || [])
+    .map(formatItem)
+    .filter(Boolean);
 
-    // Sort by count desc, then winrate desc as tiebreaker
-    const sortedStartingItems = [...validStartingItems].sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return (b.winrate || 0) - (a.winrate || 0);
-    });
+  // Build items (flat array from API - server already sorted in purchase order)
+  // DO NOT sort or split - order is: Slot 1 → Slot 6
+  const buildItems = (buildData.items || [])
+    .map(formatItem)
+    .filter(Boolean);
 
-    // Take top 2 valid starting items
-    for (const item of sortedStartingItems.slice(0, 2)) {
-      startingItems.push(formatItem(item));
-    }
-  }
-
-  // Core items (first 3 completed items from slots, excluding boots and starting items)
-  const coreItems = [];
-  const startingItemIds = new Set(startingItems.map((i) => i.id));
-
-  for (const slotName of ["first", "second", "third"]) {
-    const bestItem = getBestItemFromSlot(slotName);
-    if (
-      bestItem &&
-      !bootIds.includes(bestItem.id) &&
-      !startingItemIds.has(bestItem.id)
-    ) {
-      coreItems.push(formatItem(bestItem));
-    }
-  }
-
-  // Boots (find boots from any slot)
-  let boots = null;
-  for (const slot of itemsArray) {
-    if (slot.items) {
-      const bootItem = slot.items.find((i) => bootIds.includes(i.id));
-      if (bootItem && (!boots || bootItem.count > boots.count)) {
-        boots = formatItem(bootItem);
-      }
-    }
-  }
-
-  // Full build (items from slots 4-6)
-  const fullBuildItems = [];
-  for (const slotName of ["fourth", "fifth", "sixth"]) {
-    const bestItem = getBestItemFromSlot(slotName);
-    if (bestItem && !bootIds.includes(bestItem.id)) {
-      fullBuildItems.push(formatItem(bestItem));
-    }
-  }
-
-  // Situational items (other popular items not in core/starting)
-  const situationalItems = [];
-  const usedIds = new Set(
-    [
-      ...startingItems.map((i) => i?.id),
-      ...coreItems.map((i) => i?.id),
-      ...fullBuildItems.map((i) => i?.id),
-      boots?.id,
-    ].filter(Boolean),
-  );
-
-  for (const slot of itemsArray) {
-    if (slot.items) {
-      for (const item of slot.items.slice(0, 3)) {
-        if (
-          !usedIds.has(item.id) &&
-          !bootIds.includes(item.id) &&
-          !validStarterIds.includes(item.id)
-        ) {
-          situationalItems.push(formatItem(item));
-          usedIds.add(item.id);
-          if (situationalItems.length >= 4) break;
-        }
-      }
-    }
-    if (situationalItems.length >= 4) break;
-  }
+  // Boots (directly from API)
+  const boots = formatItem(buildData.boots);
 
   // === SKILLS ===
   const skillOrderArray = buildData.skill_order || [];
@@ -698,11 +568,9 @@ function formatBuildResponse(data, champion, role) {
       shards: shards,
     },
     items: {
-      starting: startingItems.filter(Boolean),
-      core: coreItems.filter(Boolean),
+      starting: startingItems,
+      build: buildItems,  // Single array in purchase order (Slot 1 → Slot 6)
       boots: boots,
-      full_build: fullBuildItems.filter(Boolean),
-      situational: situationalItems.filter(Boolean),
     },
     skills: { order: skillOrder },
     summoners: summoners,
@@ -748,7 +616,7 @@ function makeErrorResponse(errorMsg, champion, role) {
       secondary: [],
       shards: [],
     },
-    items: { starting: [], core: [], boots: null },
+    items: { starting: [], build: [], boots: null },
     skills: { order: [], priority: "" },
     summoners: [],
     winrate: null,
