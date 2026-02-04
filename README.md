@@ -126,7 +126,6 @@
 |---------|------------------|-------------|-------------|
 | **Purpose** | Promotion & docs | Full app | Data source |
 | **Access** | Any browser | Windows only | Programmatic |
-| **Offline Mode** | ❌ No | ✅ Yes | N/A |
 | **Auto-Updates** | N/A | ✅ Built-in | Manual deploy |
 | **Performance** | 🌐 Static | ⚡ Native | 🚀 Rust optimized |
 | **Installation** | None | Required (.exe) | Server only |
