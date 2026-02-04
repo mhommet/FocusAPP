@@ -538,6 +538,69 @@ function getRoleIcon(role) {
     return roleIcons[role?.toLowerCase()] || '';
 }
 
+/**
+ * Capitalize champion name for DataDragon URLs.
+ * Handles special cases like "jarvaniv" -> "JarvanIV", "leesin" -> "Leesin".
+ * DataDragon expects exact casing for champion IDs.
+ *
+ * @param {string} name - Champion name (can be lowercase from API)
+ * @returns {string} Properly capitalized champion name for DDragon
+ */
+function capitalizeChampionName(name) {
+    if (!name) return 'Unknown';
+
+    // Special mappings for champions with non-standard DDragon IDs
+    const specialMappings = {
+        'aurelionsol': 'AurelionSol',
+        'belveth': 'Belveth',
+        'chogath': 'Chogath',
+        'drmundo': 'DrMundo',
+        'jarvaniv': 'JarvanIV',
+        'jarvan iv': 'JarvanIV',
+        'kaisa': 'Kaisa',
+        'khazix': 'Khazix',
+        'kogmaw': 'KogMaw',
+        'ksante': 'KSante',
+        'leesin': 'LeeSin',
+        'lee sin': 'LeeSin',
+        'masteryi': 'MasterYi',
+        'master yi': 'MasterYi',
+        'missfortune': 'MissFortune',
+        'miss fortune': 'MissFortune',
+        'monkeyking': 'MonkeyKing',
+        'wukong': 'MonkeyKing',
+        'nunu': 'Nunu',
+        'nunuwillump': 'Nunu',
+        'nunu & willump': 'Nunu',
+        'reksai': 'RekSai',
+        'rek\'sai': 'RekSai',
+        'renata': 'Renata',
+        'renataglasc': 'Renata',
+        'renata glasc': 'Renata',
+        'tahmkench': 'TahmKench',
+        'tahm kench': 'TahmKench',
+        'twistedfate': 'TwistedFate',
+        'twisted fate': 'TwistedFate',
+        'velkoz': 'Velkoz',
+        'vel\'koz': 'Velkoz',
+        'xinzhao': 'XinZhao',
+        'xin zhao': 'XinZhao'
+    };
+
+    // Normalize input: lowercase, remove special characters for lookup
+    const normalized = name.toLowerCase().replace(/[^a-z\s]/g, '');
+
+    // Check special mappings first
+    if (specialMappings[normalized]) {
+        return specialMappings[normalized];
+    }
+
+    // Default: capitalize first letter, keep rest as-is (handles most champions)
+    // Also remove spaces and special characters for DDragon URL compatibility
+    const cleaned = name.replace(/[^a-zA-Z]/g, '');
+    return cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+}
+
 function updatePagination(totalPages) {
     const pagination = document.getElementById('pagination');
     if (!pagination) return;
@@ -2296,19 +2359,24 @@ function globalSearch(query) {
     if (query.includes('#')) {
         const [gameName, tagLine] = query.split('#');
         if (gameName && tagLine && tagLine.length >= 2) {
-            // Show loading state in dropdown
+            // Show hint to press ENTER - don't auto-search
             dropdown.innerHTML = `
-                <div class="global-search-loading">
-                    <div class="spinner-ring small"></div>
-                    <span>Searching player ${gameName}#${tagLine}...</span>
+                <div class="global-search-player-hint">
+                    <i class="fas fa-user"></i>
+                    <span>Press <kbd>Enter</kbd> to search player <strong>${gameName}#${tagLine}</strong></span>
                 </div>
             `;
             dropdown.classList.add('visible');
-
-            // Debounce player search
-            globalSearchDebounce = setTimeout(() => {
-                searchPlayer(gameName.trim(), tagLine.trim());
-            }, 400);
+            return;
+        } else if (gameName) {
+            // Show hint that tag is incomplete
+            dropdown.innerHTML = `
+                <div class="global-search-player-hint">
+                    <i class="fas fa-user"></i>
+                    <span>Type tag after # (e.g. ${gameName}#EUW)</span>
+                </div>
+            `;
+            dropdown.classList.add('visible');
             return;
         }
     }
@@ -2580,6 +2648,19 @@ function selectChampionFromGlobalSearch(champId, champName, role = 'top') {
  */
 function handleGlobalSearchKeyboard(e) {
     const dropdown = document.getElementById('global-search-results');
+    const searchInput = document.getElementById('global-search');
+    const query = searchInput?.value || '';
+
+    // Handle ENTER for player search (query contains #)
+    if (e.key === 'Enter' && query.includes('#')) {
+        e.preventDefault();
+        const [gameName, tagLine] = query.split('#');
+        if (gameName && tagLine && tagLine.length >= 2) {
+            searchPlayer(gameName.trim(), tagLine.trim());
+        }
+        return;
+    }
+
     if (!dropdown || !dropdown.classList.contains('visible')) return;
 
     const items = dropdown.querySelectorAll('.global-search-result');
@@ -2648,8 +2729,9 @@ let lastPlayerSearch = { gameName: '', tagLine: '' };
  *
  * @param {string} gameName - Player's game name
  * @param {string} tagLine - Player's tag line
+ * @param {boolean} forceRefresh - Force fresh data from Riot API (bypass cache)
  */
-async function searchPlayer(gameName, tagLine) {
+async function searchPlayer(gameName, tagLine, forceRefresh = false) {
     const dropdown = document.getElementById('global-search-results');
 
     // Store for retry
@@ -2668,14 +2750,23 @@ async function searchPlayer(gameName, tagLine) {
     showPlayerLoading();
 
     try {
-        console.log(`[PlayerSearch] Searching for ${gameName}#${tagLine}`);
+        console.log(`[PlayerSearch] Searching for ${gameName}#${tagLine}${forceRefresh ? ' (force refresh)' : ''}`);
 
-        // Call the backend API
-        const API_KEY = window.env?.FOCUS_API_KEY || "dev_key_fallback";
+        // Call the backend API using Tauri HTTP plugin
+        let API_KEY = "dev_key_fallback";
+        try {
+            if (window.__TAURI__?.core?.invoke) {
+                API_KEY = await window.__TAURI__.core.invoke("get_env_api_key");
+            }
+        } catch (e) {
+            console.warn('[PlayerSearch] Could not get API key:', e);
+        }
 
-        const response = await window.TAURI.http.fetch(
-          `https://api.hommet.ch/api/v1/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
-          {
+        // Build URL with optional refresh parameter
+        const baseUrl = `https://api.hommet.ch/api/v1/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`;
+        const url = forceRefresh ? `${baseUrl}?refresh=true` : baseUrl;
+
+        const response = await window.__TAURI__.http.fetch(url, {
             method: "GET",
             headers: {
               Accept: "application/json",
@@ -2740,12 +2831,71 @@ function retryPlayerSearch() {
 }
 
 /**
- * Refresh the current player profile.
+ * Refresh the current player profile with fresh data from Riot API.
+ * Disables button and shows loading state during the request.
  */
-function refreshPlayerProfile() {
-    if (lastPlayerSearch.gameName && lastPlayerSearch.tagLine) {
-        searchPlayer(lastPlayerSearch.gameName, lastPlayerSearch.tagLine);
-        showToast('Refreshing player data...', 'info');
+async function refreshPlayerProfile() {
+    if (!lastPlayerSearch.gameName || !lastPlayerSearch.tagLine) {
+        showToast('No player to refresh', 'error');
+        return;
+    }
+
+    // Get the refresh button by ID
+    const refreshBtn = document.getElementById('profile-update-btn');
+    const originalContent = refreshBtn?.innerHTML;
+
+    try {
+        // Disable button and show loading state
+        if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Mise à jour...';
+        }
+
+        showToast('Fetching fresh data from Riot...', 'info');
+
+        // Call the backend API with refresh=true
+        let API_KEY = "dev_key_fallback";
+        try {
+            if (window.__TAURI__?.core?.invoke) {
+                API_KEY = await window.__TAURI__.core.invoke("get_env_api_key");
+            }
+        } catch (e) {
+            console.warn('[PlayerRefresh] Could not get API key:', e);
+        }
+
+        const { gameName, tagLine } = lastPlayerSearch;
+        const url = `https://api.hommet.ch/api/v1/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}?refresh=true`;
+
+        console.log(`[PlayerRefresh] Force refreshing ${gameName}#${tagLine}`);
+
+        const response = await window.__TAURI__.http.fetch(url, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+                "X-API-Key": API_KEY,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to refresh (${response.status})`);
+        }
+
+        const data = await response.json();
+        console.log('[PlayerRefresh] Fresh data received:', data);
+
+        // Update the profile with new data
+        renderPlayerProfile(data);
+        showToast('Profile updated with fresh data!', 'success');
+
+    } catch (error) {
+        console.error('[PlayerRefresh] Error:', error);
+        showToast(`Failed to refresh: ${error.message}`, 'error');
+    } finally {
+        // Restore button state
+        if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalContent || '<i class="fas fa-sync-alt"></i> Update';
+        }
     }
 }
 
@@ -2754,78 +2904,175 @@ function refreshPlayerProfile() {
  * @param {Object} data - Player data from API
  */
 function renderPlayerProfile(data) {
-    currentPlayerData = data;
+  currentPlayerData = data;
+  console.log("[Profile] Rendering with data:", data);
 
-    const loading = document.getElementById('player-loading');
-    const error = document.getElementById('player-error');
-    const content = document.getElementById('player-content');
+  const loading = document.getElementById("player-loading");
+  const error = document.getElementById("player-error");
+  const content = document.getElementById("player-content");
 
-    if (loading) loading.style.display = 'none';
-    if (error) error.style.display = 'none';
-    if (content) content.style.display = 'block';
+  if (loading) loading.style.display = "none";
+  if (error) error.style.display = "none";
+  if (content) content.style.display = "block";
 
-    const player = data.player_info || data.player || {};
-    const matches = data.recent_matches || data.matches || [];
+  // ==========================================================
+  // 1. DATA ADAPTER
+  // ==========================================================
+  const profile = data.profile || {};
+  const stats = data.stats || {};
+  const tags = data.tags || [];
+  let rawMatches = data.recent_builds || []; // API renvoie 'recent_builds'
 
-    // --- Header Section ---
-    const avatarEl = document.getElementById('player-page-avatar');
-    const nameEl = document.getElementById('player-page-name');
-    const levelEl = document.getElementById('player-page-level');
+  // Si on n'a pas de rang dans le profil, on regarde si on peut le déduire (non, pas dispo ici)
+  // On met des valeurs par défaut pour éviter le "undefined"
+  const displayTier = (profile.tier || stats.tier || "UNRANKED").toUpperCase();
+  const displayRank = profile.rank || stats.rank || "";
+  const displayLP = profile.lp || stats.lp || 0;
 
-    const profileIconId = player.profile_icon_id || player.profileIconId || 29;
-    if (avatarEl) {
-        avatarEl.src = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/${profileIconId}.png`;
-        avatarEl.onerror = () => { avatarEl.src = 'https://ddragon.leagueoflegends.com/cdn/14.10.1/img/profileicon/29.png'; };
+  // Normalisation des matchs (KDA string -> numbers)
+  const matches = rawMatches.map((m) => {
+    let k = 0,
+      d = 0,
+      a = 0;
+    if (typeof m.kda === "string" && m.kda.includes("/")) {
+      const parts = m.kda.split("/");
+      k = parseInt(parts[0]) || 0;
+      d = parseInt(parts[1]) || 0;
+      a = parseInt(parts[2]) || 0;
     }
+    return {
+      ...m,
+      champion_name: m.champion, // L'API renvoie 'champion', le front veut 'champion_name'
+      win: m.win,
+      kills: k,
+      deaths: d,
+      assists: a,
+    };
+  });
 
-    if (nameEl) {
-        nameEl.textContent = `${player.game_name || player.name || 'Unknown'}#${player.tag_line || player.tag || '???'}`;
+  // ==========================================================
+  // 2. HEADER (Identité + Tags)
+  // ==========================================================
+  const nameEl = document.getElementById("player-page-name");
+  const avatarEl = document.getElementById("player-page-avatar");
+  const levelEl = document.getElementById("player-page-level");
+
+  // Nom
+  if (nameEl) {
+    nameEl.textContent = `${profile.game_name} #${profile.tag_line}`;
+  }
+
+  // Avatar - Using CommunityDragon CDN for profile icons
+  if (avatarEl) {
+    const iconId = profile.profile_icon_id || 29;
+    avatarEl.src = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/${iconId}.jpg`;
+    avatarEl.onerror = () => {
+      // Fallback to default icon 29 if the icon doesn't exist
+      avatarEl.src = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/profile-icons/29.jpg`;
+    };
+  }
+
+  // Summoner Level
+  if (levelEl) {
+    levelEl.textContent = profile.summoner_level
+      ? `Lvl ${profile.summoner_level}`
+      : "";
+  }
+
+  // --- TAGS (C'est ici que ça se joue) ---
+  const tagsContainer = document.getElementById("player-tags");
+  if (tagsContainer) {
+    tagsContainer.innerHTML = ""; // Reset
+    tagsContainer.style.display = tags && tags.length > 0 ? "flex" : "none";
+
+    tags.forEach((tag) => {
+      const span = document.createElement("span");
+      // Si la couleur est "rainbow" ou une couleur simple
+      const colorClass =
+        tag.color === "rainbow" ? "tag-rainbow" : `tag-${tag.color}`;
+
+      // Construction HTML directe pour être sûr
+      span.className = `tag-pill ${colorClass}`;
+      span.innerHTML = `${tag.emoji || ""} ${tag.name}`;
+      span.title = tag.description || "";
+
+      // Style inline de secours si le CSS merde
+      span.style.cssText =
+        "padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 0.8em; color: white; margin-right: 5px; display: inline-flex; align-items: center; gap: 4px;";
+      if (tag.color === "blue") span.style.backgroundColor = "#3498db";
+      if (tag.color === "rainbow")
+        span.style.background = "linear-gradient(45deg, #f09, #30f, #0cc)";
+
+      tagsContainer.appendChild(span);
+    });
+  } else {
+    console.error("ERREUR : Élément #player-tags introuvable dans le HTML !");
+  }
+
+  // ==========================================================
+  // 3. RANKED CARD
+  // ==========================================================
+  const rankIcon = document.getElementById("player-rank-icon");
+  const rankText = document.getElementById("player-page-rank");
+  const rankLP = document.getElementById("player-page-lp");
+  const rankWR = document.getElementById("player-page-ranked-wr");
+
+  // Rank Icon
+  if (rankIcon) {
+    const tierLower = displayTier.toLowerCase();
+
+    if (tierLower === "unranked") {
+      rankIcon.style.display = "none";
+    } else {
+      rankIcon.style.display = "block";
+      rankIcon.src = `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/content/src/leagueclient/rankedcrests/${tierLower}/images/${tierLower}_baseface_muted.png`;
+
+      rankIcon.onerror = () => {
+        // Fallback to static assets emblem
+        rankIcon.src = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tierLower}.png`;
+        rankIcon.onerror = () => {
+          rankIcon.style.display = "none";
+        };
+      };
     }
+  }
 
-    if (levelEl) {
-        levelEl.textContent = `Level ${player.summoner_level || player.level || '?'}`;
+  // Rank Text - Format: "TIER RANK - LP" or "Unranked"
+  if (rankText) {
+    if (displayTier === "UNRANKED") {
+      rankText.textContent = "Unranked";
+    } else {
+      rankText.textContent = `${displayTier} ${displayRank}`;
     }
+  }
 
-    // --- Ranked Card ---
-    const rankIcon = document.getElementById('player-rank-icon');
-    const rankTier = document.getElementById('player-page-rank');
-    const rankLP = document.getElementById('player-page-lp');
-    const rankedWR = document.getElementById('player-page-ranked-wr');
-
-    const tier = (player.tier || player.rank || 'unranked').toLowerCase();
-    const division = player.division || player.rank_division || '';
-    const lp = player.lp || player.league_points || 0;
-    const rankedWins = player.wins || 0;
-    const rankedLosses = player.losses || 0;
-    const rankedTotal = rankedWins + rankedLosses;
-    const rankedWinrate = rankedTotal > 0 ? Math.round((rankedWins / rankedTotal) * 100) : 0;
-
-    if (rankIcon) {
-        rankIcon.src = `https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-${tier}.png`;
-        rankIcon.onerror = () => { rankIcon.src = 'https://raw.communitydragon.org/latest/plugins/rcp-fe-lol-static-assets/global/default/images/ranked-emblem/emblem-unranked.png'; };
+  // LP Display
+  if (rankLP) {
+    if (displayTier === "UNRANKED") {
+      rankLP.textContent = "";
+    } else {
+      rankLP.textContent = `${displayLP} LP`;
     }
+  }
 
-    if (rankTier) {
-        rankTier.textContent = tier === 'unranked' ? 'Unranked' : `${tier.charAt(0).toUpperCase() + tier.slice(1)} ${division}`;
+  // Winrate (Calculé depuis les stats récentes puisque l'API ne donne pas le WR global ranked)
+  if (rankWR) {
+    if (stats.winrate) {
+      const wr = Math.round(stats.winrate * 100);
+      rankWR.textContent = `${wr}% WR (Recent)`;
+    } else {
+      rankWR.textContent = "No data";
     }
+  }
 
-    if (rankLP) {
-        rankLP.textContent = tier === 'unranked' ? '' : `${lp} LP`;
-    }
-
-    if (rankedWR) {
-        rankedWR.textContent = rankedTotal > 0 ? `${rankedWinrate}% WR (${rankedWins}W ${rankedLosses}L)` : 'No ranked games';
-    }
-
-    // --- Top Champions ---
-    renderTopChampions(matches);
-
-    // --- Recent Stats ---
-    renderRecentStats(matches);
-
-    // --- Match History ---
-    renderMatchHistory(matches);
+  // ==========================================================
+  // 4. HISTORIQUE
+  // ==========================================================
+  if (typeof renderMatchHistory === "function") renderMatchHistory(matches);
+  if (typeof renderTopChampions === "function") renderTopChampions(matches);
+  if (typeof renderRecentStats === "function") renderRecentStats(matches);
 }
+
 
 /**
  * Render top champions from recent matches.
@@ -2859,14 +3106,15 @@ function renderTopChampions(matches) {
 
     container.innerHTML = topChamps.map(champ => {
         const winrate = Math.round((champ.wins / champ.games) * 100);
-        const champIcon = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/${champ.name.replace(/[^a-zA-Z]/g, '')}.png`;
+        // Use capitalizeChampionName for proper DDragon URL formatting
+        const champIcon = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/${capitalizeChampionName(champ.name)}.png`;
 
         return `
             <div class="top-champ-item">
                 <img src="${champIcon}" class="top-champ-icon"
                      onerror="this.src='https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/Aatrox.png'">
                 <div class="top-champ-info">
-                    <span class="top-champ-name">${champ.name}</span>
+                    <span class="top-champ-name">${capitalizeChampionName(champ.name)}</span>
                     <span class="top-champ-stats">${champ.games} games</span>
                 </div>
                 <span class="top-champ-wr ${winrate >= 50 ? 'positive' : 'negative'}">${winrate}%</span>
@@ -2909,6 +3157,24 @@ function renderRecentStats(matches) {
 }
 
 /**
+ * Map queue ID to game mode name.
+ * @param {number} queueId - Queue ID from API
+ * @returns {string} Game mode name
+ */
+function getGameModeName(queueId) {
+    const queueMap = {
+        420: "Ranked Solo",
+        440: "Ranked Flex",
+        450: "ARAM",
+        400: "Normal Draft",
+        430: "Blind Pick",
+        490: "Quickplay",
+        1700: "Arena"
+    };
+    return queueMap[queueId] || "Normal";
+}
+
+/**
  * Render the match history list.
  * @param {Array} matches - Recent matches
  */
@@ -2942,13 +3208,15 @@ function renderMatchHistory(matches) {
         const kdaClass = deaths === 0 ? 'perfect' : (parseFloat(kdaRatio) >= 3 ? 'good' : '');
 
         const items = match.items || [];
-        const gameMode = match.game_mode || match.queue_type || 'Normal';
-        const gameDuration = match.game_duration || 0;
-        const durationMin = Math.floor(gameDuration / 60);
+        const gameMode = match.queue_id ? getGameModeName(match.queue_id) : (match.game_mode || 'Normal');
+        // API returns game_duration_minutes directly
+        const durationMin = match.game_duration_minutes || Math.floor((match.game_duration || 0) / 60);
         const cs = match.cs || match.total_minions_killed || 0;
+        const csPerMin = durationMin > 0 ? (cs / durationMin).toFixed(1) : '0.0';
         const champLevel = match.champ_level || match.champion_level || 0;
 
-        const champIcon = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/${championName.replace(/[^a-zA-Z]/g, '')}.png`;
+        // Use capitalizeChampionName for proper DDragon URL formatting
+        const champIcon = `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/champion/${capitalizeChampionName(championName)}.png`;
 
         // Render items (all 6 + trinket)
         const itemSlots = [...items.slice(0, 7)];
@@ -2958,7 +3226,8 @@ function renderMatchHistory(matches) {
             if (!itemId || itemId === 0) {
                 return '<div class="match-card-item empty"></div>';
             }
-            return `<img src="https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/${itemId}.png"
+            // Use DDragon with latest version for item icons
+            return `<img src="https://ddragon.leagueoflegends.com/cdn/16.3.1/img/item/${itemId}.png"
                          class="match-card-item"
                          onerror="this.className='match-card-item empty'">`;
         }).join('');
@@ -2988,17 +3257,12 @@ function renderMatchHistory(matches) {
                     <div class="match-card-meta">
                         <span><i class="fas fa-gamepad"></i> ${gameMode}</span>
                         <span><i class="fas fa-clock"></i> ${durationMin}m</span>
-                        <span><i class="fas fa-coins"></i> ${cs} CS</span>
+                        <span><i class="fas fa-coins"></i> ${cs} CS (${csPerMin}/m)</span>
                     </div>
                     <div class="match-card-build">
                         <div class="match-card-items">${itemsHtml}</div>
                         <div class="match-card-runes">${runesHtml}</div>
                     </div>
-                </div>
-                <div class="match-card-actions">
-                    <button class="btn-import-build" onclick="loadBuildFromMatch(${index})">
-                        <i class="fas fa-bolt"></i> Import
-                    </button>
                 </div>
             </div>
         `;
@@ -3037,110 +3301,6 @@ function getRunePathImage(keystoneId) {
         8369: '7203_whimsy/firststrike/firststrike.png',
     };
     return runeMap[keystoneId] || '7201_precision/presstheattack/presstheattack.png';
-}
-
-/**
- * Load a build from a specific match in the player modal.
- * Populates the main editor and closes the modal.
- *
- * @param {number} matchIndex - Index of the match in currentPlayerData.matches
- */
-async function loadBuildFromMatch(matchIndex) {
-    if (!currentPlayerData) {
-        console.error('[LoadBuild] No player data available');
-        return;
-    }
-
-    const matches = currentPlayerData.recent_matches || currentPlayerData.matches || [];
-    const match = matches[matchIndex];
-
-    if (!match) {
-        console.error('[LoadBuild] Match not found at index:', matchIndex);
-        return;
-    }
-
-    console.log('[LoadBuild] Loading build from match:', match);
-
-    const championName = match.champion_name || match.championName || 'Unknown';
-    const playerName = currentPlayerData.player_info?.game_name || currentPlayerData.player?.name || 'Player';
-
-    // Close modal
-    closePlayerModal();
-
-    // Switch to builds tab
-    switchTab('builds');
-
-    // Wait a bit for tab switch
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Set champion in the build view
-    const champSearchInput = document.getElementById('champion-search');
-    if (champSearchInput) {
-        champSearchInput.value = championName;
-    }
-
-    // Build a custom build object from match data
-    const customBuild = {
-        champion: championName,
-        role: match.role || match.lane || 'mid',
-        source: `${playerName}'s match`,
-        patch: 'current',
-        items: {
-            starting: [],
-            build: (match.items || []).filter(id => id && id !== 0).map(id => ({ id })),
-            boots: null
-        },
-        runes: {
-            keystone: match.runes?.keystone ? { id: match.runes.keystone } : null,
-            primary: (match.runes?.primary_runes || []).map(id => ({ id })),
-            secondary: (match.runes?.secondary_runes || []).map(id => ({ id })),
-            shards: (match.runes?.stat_shards || [5008, 5008, 5002]).map(id => ({ id }))
-        },
-        summoners: (match.summoner_spells || []).map(id => ({ id }))
-    };
-
-    // Try to load the champion build first, then overlay with match data
-    try {
-        // Load base build for champion
-        await loadChampionBuild(championName);
-
-        // Override with match items if available
-        if (currentBuild && match.items && match.items.length > 0) {
-            // Merge items from match
-            const matchItems = match.items.filter(id => id && id !== 0);
-            if (matchItems.length > 0) {
-                // Update items in currentBuild
-                currentBuild.items = currentBuild.items || {};
-                currentBuild.items.build = matchItems.map(id => ({
-                    id,
-                    icon: `https://ddragon.leagueoflegends.com/cdn/14.10.1/img/item/${id}.png`
-                }));
-            }
-
-            // Override runes if available
-            if (match.runes) {
-                currentBuild.runes = currentBuild.runes || {};
-                if (match.runes.keystone) {
-                    currentBuild.runes.keystone = {
-                        id: match.runes.keystone,
-                        icon: `https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/perk-images/styles/${getRunePathImage(match.runes.keystone)}`
-                    };
-                }
-            }
-
-            // Re-render with updated data
-            renderBuild(currentBuild);
-        }
-
-    } catch (error) {
-        console.log('[LoadBuild] Could not load base build, using match data only');
-        // Fallback: set currentBuild to custom build
-        currentBuild = customBuild;
-        renderBuild(currentBuild);
-    }
-
-    // Show success toast
-    showToast(`Build loaded from ${playerName}!`, 'success');
 }
 
 // Close modal on Escape key
@@ -3409,7 +3569,6 @@ window.loadGlobalSearchChampions = loadGlobalSearchChampions;
 window.searchPlayer = searchPlayer;
 window.retryPlayerSearch = retryPlayerSearch;
 window.refreshPlayerProfile = refreshPlayerProfile;
-window.loadBuildFromMatch = loadBuildFromMatch;
 window.initChangelog = initChangelog;
 window.refreshChangelog = refreshChangelog;
 

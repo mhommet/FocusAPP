@@ -221,10 +221,15 @@
                         <img id="player-page-avatar" class="player-page-avatar" src="" alt="Avatar">
                         <div class="player-page-info">
                             <h1 id="player-page-name">Player#TAG</h1>
+                    
+                            <!-- ✅ AJOUT DES TAGS ICI -->
+                            <div id="player-tags" class="player-tags" style="display: flex; gap: 8px; margin: 5px 0; flex-wrap: wrap;">
+                            </div>
+                    
                             <span id="player-page-level" class="player-level">Level 0</span>
                         </div>
                     </div>
-                    <button class="btn btn-refresh-small" onclick="refreshPlayerProfile()">
+                    <button id="profile-update-btn" class="btn btn-refresh-small" onclick="refreshPlayerProfile()">
                         <i class="fas fa-sync-alt"></i> Update
                     </button>
                 </div>
@@ -237,7 +242,9 @@
                         <div class="player-ranked-card">
                             <h3><i class="fas fa-trophy"></i> Ranked Solo/Duo</h3>
                             <div class="ranked-info">
-                                <img id="player-rank-icon" class="rank-emblem" src="" alt="Rank">
+                                <div class="rank-emblem-container">
+                                    <img id="player-rank-icon" class="rank-emblem" src="" alt="Rank">
+                                </div>
                                 <div class="ranked-details">
                                     <span id="player-page-rank" class="rank-tier">Unranked</span>
                                     <span id="player-page-lp" class="rank-lp">0 LP</span>
@@ -397,6 +404,7 @@
                 <img id="player-avatar" class="player-avatar" src="" alt="Avatar">
                 <div class="player-info">
                     <h2 id="player-name" class="player-name">Loading...</h2>
+                    <div id="player-tags" class="player-tags" style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;"></div>
                     <div class="player-rank-container">
                         <span id="player-rank" class="player-rank-badge">Unranked</span>
                         <span id="player-winrate" class="player-winrate">0% WR (0W/0L)</span>
