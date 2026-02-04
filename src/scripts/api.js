@@ -22,9 +22,22 @@ const API_BASE_URL = "https://api.hommet.ch/api/v1";
 const DDRAGON_BASE_URL = "https://ddragon.leagueoflegends.com";
 const DEFAULT_TIMEOUT = 30; // seconds
 const RETRY_COUNT = 3;
+let API_KEY = "";
 
-// API Key for authenticated endpoints
-const API_KEY = "focusapp_prod_2026_x7k9p2m4q8v1n5r3";
+async function initApi() {
+  if (window.__TAURI__) {
+    try {
+      // Appelle la fonction Rust qu'on vient de créer
+      API_KEY = await window.__TAURI__.core.invoke("get_env_api_key");
+      console.log("🔑 API Key loaded successfully");
+    } catch (e) {
+      console.error("Failed to load API Key:", e);
+      API_KEY = "dev_key_fallback";
+    }
+  }
+}
+
+initApi();
 
 // Cache for DDragon version
 let cachedDDragonVersion = "14.10.1";

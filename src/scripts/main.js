@@ -2671,16 +2671,19 @@ async function searchPlayer(gameName, tagLine) {
         console.log(`[PlayerSearch] Searching for ${gameName}#${tagLine}`);
 
         // Call the backend API
-        const response = await window.__TAURI__.http.fetch(
-            `https://api.hommet.ch/api/v1/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
-            {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-API-Key': 'focusapp_prod_2026_x7k9p2m4q8v1n5r3'
-                }
-            }
+        const API_KEY = window.env?.FOCUS_API_KEY || "dev_key_fallback";
+
+        const response = await window.TAURI.http.fetch(
+          `https://api.hommet.ch/api/v1/player/${encodeURIComponent(gameName)}/${encodeURIComponent(tagLine)}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "X-API-Key": API_KEY,
+            },
+          },
         );
+
 
         if (!response.ok) {
             throw new Error(`Player not found (${response.status})`);

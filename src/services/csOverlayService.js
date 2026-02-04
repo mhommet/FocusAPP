@@ -38,9 +38,22 @@
 
 // Configuration
 const FOCUS_API_BASE = "https://api.hommet.ch/api/v1";
-const API_KEY = "focusapp_prod_2026_x7k9p2m4q8v1n5r3";
+let API_KEY = "";
 const POLLING_INTERVAL_MS = 3000; // 3 secondes
 const GAME_CHECK_INTERVAL_MS = 5000; // 5 secondes
+
+async function initOverlayService() {
+  if (window.__TAURI__) {
+    try {
+      API_KEY = await window.__TAURI__.core.invoke("get_env_api_key");
+      console.log("[CSOverlay] API Key loaded");
+    } catch (e) {
+      console.error("[CSOverlay] Failed to load Key:", e);
+    }
+  }
+}
+
+initOverlayService();
 
 // Utilise Tauri HTTP plugin - lazy initialization to avoid accessing __TAURI__ before ready
 let _tauriFetch = null;

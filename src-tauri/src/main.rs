@@ -37,10 +37,22 @@ use lcu::{
 };
 use serde::{Deserialize, Serialize};
 use std::panic;
+use std::env;
+use std::sync::LazyLock;
+use dotenvy::dotenv;
 
 /// API configuration
 const FOCUS_API_BASE_URL: &str = "https://api.hommet.ch/api/v1";
-const FOCUS_API_KEY: &str = "focusapp_prod_2026_x7k9p2m4q8v1n5r3";
+
+// Charge la clé au démarrage (GLOBAL)
+static FOCUS_API_KEY: LazyLock<String> = LazyLock::new(|| {
+    env::var("FOCUS_API_KEY").expect("FOCUS_API_KEY must be set")
+});
+
+#[tauri::command]
+fn get_env_api_key() -> String {
+    FOCUS_API_KEY.to_string()
+}
 
 /// Runes primary/secondary structure for API request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -255,7 +267,7 @@ async fn fetch_import_payloads(
 
     let response = client
         .post(&url)
-        .header("X-API-Key", FOCUS_API_KEY)
+        .header("X-API-Key", &*FOCUS_API_KEY)
         .json(payload)
         .send()
         .await?;
@@ -378,6 +390,7 @@ fn initialize_app() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn main() {
+    dotenv().ok();
     // Run initialization and catch any errors before Tauri starts
     if let Err(e) = initialize_app() {
         eprintln!("Initialization error: {:?}", e);
@@ -387,6 +400,7 @@ fn main() {
             eprintln!("Press Enter to exit...");
             let mut input = String::new();
             let _ = std::io::stdin().read_line(&mut input);
+            eprintln!("🔑 API Key loaded: {} chars", FOCUS_API_KEY.len());
         }
         std::process::exit(1);
     }
@@ -398,6 +412,7 @@ fn main() {
             import_build_to_client,
             is_league_client_running,
             set_summoner_spells_cmd,
+            get_env_api_key,
             get_champion_select_session_cmd,
             // CS Overlay commands
             overlay::is_game_active,
