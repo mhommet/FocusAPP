@@ -38,17 +38,16 @@ use lcu::{
 };
 use serde::{Deserialize, Serialize};
 use std::panic;
-use std::env;
-use std::sync::LazyLock;
-use dotenvy::dotenv;
 
 /// API configuration
 const FOCUS_API_BASE_URL: &str = "https://api.hommet.ch/api/v1";
 
-// Charge la clé au démarrage (GLOBAL)
-static FOCUS_API_KEY: LazyLock<String> = LazyLock::new(|| {
-    env::var("FOCUS_API_KEY").expect("FOCUS_API_KEY must be set")
-});
+/// API key embedded at compile time via `FOCUS_API_KEY` env var.
+/// Build with: FOCUS_API_KEY=your_key cargo tauri build
+const FOCUS_API_KEY: &str = match option_env!("FOCUS_API_KEY") {
+    Some(key) => key,
+    None => "",
+};
 
 #[tauri::command]
 fn get_env_api_key() -> String {
@@ -268,7 +267,7 @@ async fn fetch_import_payloads(
 
     let response = client
         .post(&url)
-        .header("X-API-Key", &*FOCUS_API_KEY)
+        .header("X-API-Key", FOCUS_API_KEY)
         .json(payload)
         .send()
         .await?;
@@ -385,57 +384,44 @@ async fn get_current_summoner_cmd() -> Result<CurrentSummoner, CommandError> {
 /// Initialize the application with proper error handling.
 /// This function runs before Tauri starts to catch early errors.
 fn initialize_app() -> Result<(), Box<dyn std::error::Error>> {
-    // Set up panic hook for better error messages in debug builds
-    #[cfg(debug_assertions)]
-    {
-        panic::set_hook(Box::new(|panic_info| {
-            eprintln!("=== PANIC DETECTED ===");
-            eprintln!("{}", panic_info);
-            if let Some(location) = panic_info.location() {
-                eprintln!(
-                    "Location: {}:{}:{}",
-                    location.file(),
-                    location.line(),
-                    location.column()
-                );
-            }
-            eprintln!("======================");
-        }));
-    }
+    // Set up panic hook in ALL builds — release builds are silent otherwise
+    panic::set_hook(Box::new(|panic_info| {
+        let msg = format!("=== FOCUSAPP PANIC ===\n{}\n", panic_info);
+        eprintln!("{}", msg);
 
-    // Log startup in debug mode
-    #[cfg(debug_assertions)]
-    {
-        eprintln!("=== FocusApp Starting ===");
-        eprintln!("Debug mode enabled");
-        if let Ok(exe_path) = std::env::current_exe() {
-            eprintln!("Executable path: {:?}", exe_path);
+        // Write to a crash log file next to the executable
+        if let Ok(exe) = std::env::current_exe() {
+            let crash_log = exe.with_file_name("focusapp-crash.log");
+            let _ = std::fs::write(&crash_log, &msg);
         }
-        if let Ok(cwd) = std::env::current_dir() {
-            eprintln!("Current directory: {:?}", cwd);
-        }
+    }));
+
+    // Log startup info in ALL builds — essential for diagnosing release crashes
+    eprintln!("--- FocusApp Starting ---");
+    if let Ok(exe_path) = std::env::current_exe() {
+        eprintln!("Executable: {:?}", exe_path);
     }
+    if let Ok(cwd) = std::env::current_dir() {
+        eprintln!("CWD: {:?}", cwd);
+    }
+    eprintln!("FOCUS_API_KEY embedded: {}", !FOCUS_API_KEY.is_empty());
 
     Ok(())
 }
 
 fn main() {
-    dotenv().ok();
-    // Run initialization and catch any errors before Tauri starts
+    // 1. Print immediately — visible when run from a terminal
+    eprintln!("--- APP STARTING ---");
+
+    // 2. Run initialization (panic hook + diagnostics)
     if let Err(e) = initialize_app() {
         eprintln!("Initialization error: {:?}", e);
-        #[cfg(debug_assertions)]
-        {
-            // In debug mode, wait for user to see the error
-            eprintln!("Press Enter to exit...");
-            let mut input = String::new();
-            let _ = std::io::stdin().read_line(&mut input);
-            eprintln!("🔑 API Key loaded: {} chars", FOCUS_API_KEY.len());
-        }
         std::process::exit(1);
     }
 
-    // Build and run Tauri application
+    eprintln!("--- BUILDING TAURI ---");
+
+    // 3. Build and run Tauri application
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
         .invoke_handler(tauri::generate_handler![
@@ -457,21 +443,14 @@ fn main() {
             overlay::emit_cs_update
         ])
         .setup(|_app| {
-            #[cfg(debug_assertions)]
-            eprintln!("Tauri setup complete - commands registered");
+            eprintln!("--- SETUP PHASE --- commands registered");
             Ok(())
         })
         .run(tauri::generate_context!());
 
-    // Handle Tauri errors
+    // 4. Handle Tauri errors
     if let Err(e) = result {
         eprintln!("Tauri error: {:?}", e);
-        #[cfg(debug_assertions)]
-        {
-            eprintln!("Press Enter to exit...");
-            let mut input = String::new();
-            let _ = std::io::stdin().read_line(&mut input);
-        }
         std::process::exit(1);
     }
 }

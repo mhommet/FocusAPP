@@ -96,6 +96,7 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FOCUS_API_KEY: ${{ secrets.FOCUS_API_KEY }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: 'FocusApp ${{ github.ref_name }}'
