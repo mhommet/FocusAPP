@@ -237,16 +237,10 @@ pub async fn get_live_cs_stats() -> Result<Option<LiveCsData>, String> {
 
     // Extraire les donnees
     let cs = active_player
-        .get("currentGold")
-        .and_then(|v| v.as_f64())
-        .map(|_| {
-            // currentGold n'est pas le CS, on doit chercher dans championStats
-            active_player
-                .get("championStats")
-                .and_then(|stats| stats.get("creepScore"))
-                .and_then(|v| v.as_i64())
-                .unwrap_or(0) as i32
-        })
+        .get("championStats")
+        .and_then(|stats| stats.get("creepScore"))
+        .and_then(|v| v.as_f64()) // creepScore can be float (42.0) or int (42)
+        .map(|v| v as i32)
         .unwrap_or(0);
 
     let game_time = game_stats

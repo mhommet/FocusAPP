@@ -178,10 +178,24 @@ function handleEnterChampSelect() {
     state.inChampSelect = true;
     resetChampSelectState();
 
-    // Auto-switch to Builds tab
+    // Auto-switch to Builds tab and show champ select lobby state
     if (state.autoSwitchTab && typeof window.switchTab === 'function') {
         console.log('[GameflowController] Auto-switching to Builds tab');
         window.switchTab('builds');
+
+        // Show "waiting for pick" lobby state in the build container
+        const buildContainer = document.getElementById('build-container');
+        if (buildContainer) {
+            buildContainer.innerHTML = `
+                <div class="build-placeholder champ-select-lobby">
+                    <i class="fas fa-gamepad"></i>
+                    <p>Champion Select</p>
+                    <span style="color: var(--text-muted, rgba(255,255,255,0.4)); font-size: 0.9rem;">
+                        Pick un champion pour charger le build
+                    </span>
+                </div>
+            `;
+        }
     }
 
     // Start champion select polling
@@ -414,19 +428,12 @@ async function loadAndImportBuild(championId, role) {
 
         console.log(`[GameflowController] Loading build for ${championName} (${role})`);
 
-        // Fetch and display build using existing function
-        if (typeof window.fetchAndDisplayBuild === 'function') {
-            await window.fetchAndDisplayBuild(championName, role);
-        } else {
-            // Fallback: Use API directly
-            const { getChampionBuild } = await import('./api.js');
-            const build = await getChampionBuild(championName, role);
-
-            if (build && build.success) {
-                // Store for import
-                window.currentBuild = build;
-                window.selectedChampionName = championName;
-            }
+        // Navigate to build tab and display the champion build
+        if (typeof window.navigateToBuildForChampion === 'function') {
+            await window.navigateToBuildForChampion(championName, role);
+        } else if (typeof window.switchTab === 'function') {
+            // Minimal fallback: at least switch to builds tab
+            window.switchTab('builds');
         }
 
         // Notify external listeners
@@ -472,8 +479,8 @@ async function checkAndAutoImport(championId, championName, role) {
 
     try {
         // Use existing import function if available
-        if (typeof window.importBuild === 'function') {
-            await window.importBuild();
+        if (typeof window.importBuildToClient === 'function') {
+            await window.importBuildToClient();
         } else if (typeof window.autoImportBuild === 'function') {
             await window.autoImportBuild(championName, role);
         } else {
@@ -561,8 +568,12 @@ async function getChampionNameFromId(championId) {
 
     // Fallback: Fetch from API
     try {
-        const { getChampionList } = await import('./api.js');
+        const { getChampionList } = await import('./scripts/api.js');
         const champions = await getChampionList();
+        if (champions && champions.length > 0) {
+            // Cache for future lookups
+            window.allChampions = champions;
+        }
         const champ = champions.find(c => c.id === championId || c.key === String(championId));
         return champ?.name || null;
     } catch (e) {

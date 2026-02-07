@@ -1,6 +1,6 @@
 [package]
 name = "focusapp-frontend"
-version = "1.6.4"
+version = "1.6.5"
 description = "FocusApp - League of Legends Companion"
 authors = ["Milan Hommet"]
 edition = "2021"

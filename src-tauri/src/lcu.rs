@@ -598,6 +598,9 @@ pub struct ChampSelectAction {
     pub champion_id: i64,
     /// Action completed
     pub completed: bool,
+    /// Action currently in progress (hovering/selecting)
+    #[serde(default)]
+    pub is_in_progress: bool,
     /// Action ID
     pub id: i64,
     /// Action type ("pick" or "ban")

@@ -216,32 +216,32 @@ export async function getTierlist(role = null) {
  */
 function formatChampionName(name) {
   const specialNames = {
-    'jarvaniv': 'Jarvan IV',
-    'leesin': 'Lee Sin',
-    'masteryi': 'Master Yi',
-    'missfortune': 'Miss Fortune',
-    'twistedfate': 'Twisted Fate',
-    'drmundo': 'Dr. Mundo',
-    'tahmkench': 'Tahm Kench',
-    'aurelionsol': 'Aurelion Sol',
-    'reksai': "Rek'Sai",
-    'khazix': "Kha'Zix",
-    'chogath': "Cho'Gath",
-    'kogmaw': "Kog'Maw",
-    'velkoz': "Vel'Koz",
-    'kaisa': "Kai'Sa",
-    'belveth': "Bel'Veth",
-    'ksante': "K'Sante",
-    'xinzhao': 'Xin Zhao',
-    'monkeyking': 'Wukong',
-    'wukong': 'Wukong',
-    'nunuwillump': 'Nunu & Willump',
-    'nunu': 'Nunu & Willump',
-    'renataglasc': 'Renata Glasc',
-    'renata': 'Renata Glasc',
+    jarvaniv: "Jarvan IV",
+    leesin: "Lee Sin",
+    masteryi: "Master Yi",
+    missfortune: "Miss Fortune",
+    twistedfate: "Twisted Fate",
+    drmundo: "Dr. Mundo",
+    tahmkench: "Tahm Kench",
+    aurelionsol: "Aurelion Sol",
+    reksai: "Rek'Sai",
+    khazix: "Kha'Zix",
+    chogath: "Cho'Gath",
+    kogmaw: "Kog'Maw",
+    velkoz: "Vel'Koz",
+    kaisa: "Kai'Sa",
+    belveth: "Bel'Veth",
+    ksante: "K'Sante",
+    xinzhao: "Xin Zhao",
+    monkeyking: "Wukong",
+    wukong: "Wukong",
+    nunuwillump: "Nunu & Willump",
+    nunu: "Nunu & Willump",
+    renataglasc: "Renata Glasc",
+    renata: "Renata Glasc",
   };
 
-  const normalized = name.toLowerCase().replace(/[^a-z]/g, '');
+  const normalized = name.toLowerCase().replace(/[^a-z]/g, "");
   if (specialNames[normalized]) {
     return specialNames[normalized];
   }
@@ -524,9 +524,7 @@ function formatBuildResponse(data, champion, role) {
 
   // Build items (flat array from API - server already sorted in purchase order)
   // DO NOT sort or split - order is: Slot 1 → Slot 6
-  const buildItems = (buildData.items || [])
-    .map(formatItem)
-    .filter(Boolean);
+  const buildItems = (buildData.items || []).map(formatItem).filter(Boolean);
 
   // Boots (directly from API)
   const boots = formatItem(buildData.boots);
@@ -582,7 +580,7 @@ function formatBuildResponse(data, champion, role) {
     },
     items: {
       starting: startingItems,
-      build: buildItems,  // Single array in purchase order (Slot 1 → Slot 6)
+      build: buildItems, // Single array in purchase order (Slot 1 → Slot 6)
       boots: boots,
     },
     skills: { order: skillOrder },
@@ -1017,5 +1015,5 @@ function getSpellName(spellId) {
  * Get application version.
  */
 export function getAppVersion() {
-  return "1.6.4";
+  return "1.6.5";
 }

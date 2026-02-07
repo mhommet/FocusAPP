@@ -1258,6 +1258,7 @@ async function loadChampionBuild(champNameOverride = null) {
     }
 
     if (build && build.success) {
+        applySummonerPreference(build);
         currentBuild = build;
         renderBuild(build);
         updateCacheIndicator(build);
@@ -1339,6 +1340,7 @@ async function forceRefreshBuild() {
     }
 
     if (build && build.success) {
+        applySummonerPreference(build);
         currentBuild = build;
         renderBuild(build);
         updateCacheIndicator(build);
@@ -1586,6 +1588,41 @@ async function importBuildToClient() {
 }
 
 /**
+ * Check if a summoner spell is Flash.
+ * @param {Object} spell - Summoner spell object with id and name
+ * @returns {boolean}
+ */
+function isFlash(spell) {
+    if (!spell) return false;
+    if (spell.id === 4 || spell.id === '4') return true;
+    const name = (spell.name || '').toLowerCase();
+    return name === 'flash' || name === 'summonerflash';
+}
+
+/**
+ * Apply saved summoner spell preference to a build.
+ * Ensures Flash is on the user's preferred key (D or F).
+ * @param {Object} build - Build object with summoners array
+ */
+function applySummonerPreference(build) {
+    if (!build || !build.summoners || build.summoners.length !== 2) return;
+
+    const savedFlashSlot = localStorage.getItem('focusapp_flash_slot');
+    if (savedFlashSlot === null) return; // No preference saved yet
+
+    const preferredSlot = parseInt(savedFlashSlot, 10); // 0 = D, 1 = F
+    const currentFlashIndex = build.summoners.findIndex(s => isFlash(s));
+
+    if (currentFlashIndex === -1) return; // No Flash in this build
+    if (currentFlashIndex === preferredSlot) return; // Already correct
+
+    // Swap to match preference
+    const [spell1, spell2] = build.summoners;
+    build.summoners = [spell2, spell1];
+    console.log(`[Summoners] Applied preference: Flash on ${preferredSlot === 0 ? 'D' : 'F'}`);
+}
+
+/**
  * Swap the order of summoner spells (D ↔ F).
  * Updates currentBuild, re-renders the build display, and imports to client.
  */
@@ -1600,6 +1637,13 @@ async function swapSummoners() {
     currentBuild.summoners = [spell2, spell1];
 
     console.log('[Summoners] Swapped:', spell1.name, '↔', spell2.name);
+
+    // Save Flash slot preference
+    const flashIndex = currentBuild.summoners.findIndex(s => isFlash(s));
+    if (flashIndex !== -1) {
+        localStorage.setItem('focusapp_flash_slot', String(flashIndex));
+        console.log(`[Summoners] Saved preference: Flash on ${flashIndex === 0 ? 'D' : 'F'}`);
+    }
 
     // Re-render the build to update the UI
     renderBuild(currentBuild);
@@ -2082,6 +2126,9 @@ async function autoImportBuild(championName, role) {
             showToast(`No build data for ${championName}`, 'warning');
             return;
         }
+
+        // Apply saved summoner spell preference (Flash D/F)
+        applySummonerPreference(build);
 
         // Store as current build for reference
         currentBuild = build;
