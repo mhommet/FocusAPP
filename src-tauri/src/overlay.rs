@@ -26,6 +26,9 @@
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
+// Constante pour le port Live Client API
+const LIVE_CLIENT_API_PORT: u16 = 2999;
+
 /// Configuration de l'overlay sauvegardee
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OverlayConfig {
@@ -115,19 +118,23 @@ pub async fn move_overlay(app: AppHandle, x: i32, y: i32) -> Result<(), String> 
 /// et documentee sur leur site developpeur.
 ///
 /// Endpoint local: https://127.0.0.1:2999/liveclientdata/allgamedata
+/// 
+/// # Correction
+/// Le port est bien 2999 (pas 29990 comme mentionné dans certaines docs obsolètes)
 #[tauri::command]
 pub async fn is_game_active() -> Result<bool, String> {
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true) // Certificat auto-signe de Riot
+        .danger_accept_invalid_certs(true) // Certificat auto-signe de Riot (localhost uniquement)
         .timeout(std::time::Duration::from_secs(2))
         .build()
         .map_err(|e| e.to_string())?;
 
-    match client
-        .get("https://127.0.0.1:2999/liveclientdata/allgamedata")
-        .send()
-        .await
-    {
+    let url = format!(
+        "https://127.0.0.1:{}/liveclientdata/gamestats",
+        LIVE_CLIENT_API_PORT
+    );
+
+    match client.get(&url).send().await {
         Ok(response) => Ok(response.status().is_success()),
         Err(_) => Ok(false), // Pas de partie en cours ou API inaccessible
     }
@@ -197,20 +204,25 @@ pub async fn get_active_player_puuid() -> Result<Option<String>, String> {
 
 /// Recupere les stats CS en temps reel depuis le Live Client Data API local.
 /// Retourne les CS actuels et le temps de jeu.
+/// 
+/// # Endpoint
+/// GET https://127.0.0.1:2999/liveclientdata/activeplayer
+/// GET https://127.0.0.1:2999/liveclientdata/gamestats
 #[tauri::command]
 pub async fn get_live_cs_stats() -> Result<Option<LiveCsData>, String> {
     let client = reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
+        .danger_accept_invalid_certs(true) // Sécurisé : connexion localhost uniquement
         .timeout(std::time::Duration::from_secs(2))
         .build()
         .map_err(|e| e.to_string())?;
 
     // Recuperer les stats du joueur actif
-    let active_player_response = match client
-        .get("https://127.0.0.1:2999/liveclientdata/activeplayer")
-        .send()
-        .await
-    {
+    let active_player_url = format!(
+        "https://127.0.0.1:{}/liveclientdata/activeplayer",
+        LIVE_CLIENT_API_PORT
+    );
+    
+    let active_player_response = match client.get(&active_player_url).send().await {
         Ok(resp) if resp.status().is_success() => resp,
         _ => return Ok(None),
     };
@@ -221,11 +233,12 @@ pub async fn get_live_cs_stats() -> Result<Option<LiveCsData>, String> {
         .map_err(|e| e.to_string())?;
 
     // Recuperer le temps de jeu
-    let game_stats_response = match client
-        .get("https://127.0.0.1:2999/liveclientdata/gamestats")
-        .send()
-        .await
-    {
+    let game_stats_url = format!(
+        "https://127.0.0.1:{}/liveclientdata/gamestats",
+        LIVE_CLIENT_API_PORT
+    );
+    
+    let game_stats_response = match client.get(&game_stats_url).send().await {
         Ok(resp) if resp.status().is_success() => resp,
         _ => return Ok(None),
     };

@@ -27,9 +27,11 @@
 )]
 
 mod champions;
+mod game_watcher;
 mod lcu;
 mod overlay;
 
+use game_watcher::{get_game_state, refresh_game_state, start_game_watcher, stop_game_watcher, GameWatcher};
 use lcu::{
     add_item_set, create_rune_page, find_lockfile, get_champion_select_session,
     get_current_summoner, get_gameflow_session, set_summoner_spells,
@@ -421,9 +423,13 @@ fn main() {
 
     eprintln!("--- BUILDING TAURI ---");
 
+    // Crée l'instance du GameWatcher (partagée entre threads)
+    let game_watcher = GameWatcher::new();
+
     // 3. Build and run Tauri application
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
+        .manage(game_watcher.clone()) // Injecte le watcher dans l'état Tauri
         .invoke_handler(tauri::generate_handler![
             import_build_to_client,
             is_league_client_running,
@@ -433,6 +439,11 @@ fn main() {
             // Gameflow monitoring commands
             get_gameflow_session_cmd,
             get_current_summoner_cmd,
+            // NEW: Game Watcher commands
+            get_game_state,
+            start_game_watcher,
+            stop_game_watcher,
+            refresh_game_state,
             // CS Overlay commands
             overlay::is_game_active,
             overlay::get_live_cs_stats,
@@ -442,8 +453,20 @@ fn main() {
             overlay::move_overlay,
             overlay::emit_cs_update
         ])
-        .setup(|_app| {
+        .setup(move |app| {
             eprintln!("--- SETUP PHASE --- commands registered");
+            
+            // Démarre le GameWatcher automatiquement au lancement
+            let app_handle = app.handle().clone();
+            let watcher = game_watcher.clone();
+            
+            tokio::spawn(async move {
+                // Petit délai pour laisser l'app démarrer proprement
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                watcher.start(app_handle).await;
+                eprintln!("[Setup] GameWatcher auto-started");
+            });
+            
             Ok(())
         })
         .run(tauri::generate_context!());
